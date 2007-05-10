@@ -104,13 +104,14 @@ class bdist_dpkg(Command):
                     v, r, dr = g
                     return v, int(r), int(dr)
             print l
-            raise "Don't understant the syntax in changelog"
+            raise "Don't understand the syntax in changelog"
         version,revision,drevision = get_changelog_version_revision()
         os.system("mkdir -p dist")
         tmpdir = "sympy-%s+svn%d" % (version, revision)
         print "exporting svn (%d) to dist/%s" % (revision,tmpdir)
-        os.system("svn -q export -r %d " % revision +
-                "http://sympy.googlecode.com/svn/trunk/ dist/%s" % tmpdir)  
+        #os.system("svn -q export -r %d " % revision +
+        #        "http://sympy.googlecode.com/svn/trunk/ dist/%s" % tmpdir)  
+        os.system("svn -q export . dist/%s" % tmpdir)  
         os.system("rm -rf dist/%s/debian" % tmpdir)
         print "creating dist/sympy_%s+svn%d.orig.tar.gz" % (version, revision)
         os.system("cd dist; tar zcf sympy_%s+svn%d.orig.tar.gz %s" \
