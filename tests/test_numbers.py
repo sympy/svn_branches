@@ -2,8 +2,7 @@ import sys
 sys.path.append(".")
 
 import sympy as g
-from sympy import Rational, Symbol, Real, sqrt
-import py
+from sympy import Rational, Symbol, Real
 
 def testRational():
     n1=g.Rational(1,4)
@@ -65,14 +64,12 @@ def test_Real():
     assert a.evalf() == g.Real(16.0)
 
 def test_inf():
-    assert g.oo == g.oo
-    assert g.oo != 1
-    assert 1*g.oo == g.oo
-    assert 1 != g.oo
-    assert g.oo != -g.oo
-    assert g.oo != g.Symbol("x")**3
-    assert g.oo + 1 == g.oo + 1
-    py.test.raises(ArithmeticError, lambda x: x-x, g.oo)
+    assert g.infty == g.infty
+    assert g.infty != 1
+    assert 1*g.infty == g.infty
+    assert 1 != g.infty
+    assert g.infty != -g.infty
+    assert g.infty != g.Symbol("x")**3
     
 
 def test_powers():
@@ -108,22 +105,22 @@ def test_abs1():
     assert abs(a) == a
     assert abs(-a) == a
     assert abs(-a) != -a
-    assert abs(a+g.I*b) == sqrt(a*a+b*b)
+    assert abs(a+g.I*b) == (a*a+b*b).sqrt()
 
 def test_abs2():
     a=Symbol("a", is_real=False)
     b=Symbol("b", is_real=False)
     assert abs(a) != a
     assert abs(-a) != a
-    assert abs(a+g.I*b) != sqrt(a*a+b*b)
+    assert abs(a+g.I*b) != (a*a+b*b).sqrt()
 
 def test_int():
     a=Rational(5)
     assert int(a)==5
 
 def test_sqrtbug():
-    assert ((sqrt(Rational(2))+1)*(sqrt(Rational(2))-1)).expand() == 1
+    assert ((Rational(2).sqrt()+1)*(Rational(2).sqrt()-1)).expand() == 1
 
-def test_Real_eval():
+def test_Realeval():
     a = Real(3.2)
     assert isinstance(a**2, Real)

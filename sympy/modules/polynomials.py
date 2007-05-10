@@ -1,60 +1,18 @@
 """Module with some routines for polynomials"""
 
 from sympy.core import Pow, Add, Mul, Rational, Number, Symbol, Basic
-from sympy.core.functions import diff
 
 class PolynomialException(Exception):
     pass
 
-def ispoly(p, var=None):
-    """
-    Usage
-    =====
-      ispoly(p, var) -> Returns True if p is a polynomial in variable var. 
-                        Returns False otherwise.
-        
-    Notes
-    =====
-        You can check wether it's a polynomial in several variables at once giving a 
-        tuple of symbols second argument (like ispoly(x**2 + y + 1, (x,y)) ).See
-        examples for more info.
-    
-    Examples
-    ========
-        >>> from sympy import *
-        >>> from sympy.modules.polynomials import *
-        >>> x = Symbol('x')
-        >>> ispoly(x**2+x+1, x)
-        True
-        >>> y = Symbol('y')
-        >>> ispoly(x**2 + y + 1, (x,y)) #polynomial in variables x and y
-        True
-        >>> ispoly(x**2 + exp(y) + 1, (x,y))
-        False
-        
-    See also
-    ========
-       L{get_poly}, L{coeff}
-       
-    """
-    if isinstance(var, Basic):
-        # if the var argument is not a tuple or list
-        var = [var] # so we can iterate over it
+def ispoly(p,x):
+    """Is 'p' a polynomial in 'x'? Return True or False"""
     try:
         #basically, the polynomial is whatever we can convert using
         #the get_poly(). See it's docstring for more info.
-        if var is None:
-            var = p.atoms(type=Symbol)[0] # make it work even if the user doesen't issue a variable
-            print "\t*** Warning. You have not issued a variable as argument."
-            print "\t*** Please see the interactive help on this function for more info"
-            print "\t*** Using %s as variable" % str(var)
-        for v in var:
-            get_poly(p, v)
+        get_poly(p,x)
     except PolynomialException:
         return False
-    except IndexError:
-        # if p.atoms() is empty
-        raise TypeError("Wrong arguments")
     return True
 
 def fact(n):
@@ -65,12 +23,12 @@ def fact(n):
 def coeff(poly, x, n):
     """Returns the coefficient of x**n in the polynomial"""
     assert ispoly(poly,x)
-    return diff(poly, x,n).subs(x,0)/fact(n)
+    return poly.diffn(x,n).subs(x,0)/fact(n)
 
 def get_poly(p, x):
     """Returns a python list representing the polynomial 'p(x)'.
     
-    'p' is a polynomial, for example: x**2 + 3*x*sqrt(y) - 8
+    'p' is a polynomial, for example: x**2 + 3*x*y.sqrt() - 8
     'x' is the variable of the polynomial, for example: x
     get_poly returns a python list of the form [(coeff0,n0), (coeff1,n1), ...]
     where p = coeff0*x**n0 + coeff1*x**n1 + ...
@@ -81,7 +39,7 @@ def get_poly(p, x):
     >>> from sympy.modules.polynomials import get_poly
     >>> x = Symbol("x")
     >>> y = Symbol("y")
-    >>> get_poly(x**2 + 3*x**7*sqrt(y) - 8, x)
+    >>> get_poly(x**2 + 3*x**7*y.sqrt() - 8, x)
     [(-8, 0), (1, 2), (3*y**(1/2), 7)]
 
     
@@ -94,14 +52,8 @@ def get_poly(p, x):
     if isinstance(p, Pow):
         if isinstance(p.exp, Rational) and p.exp.is_integer:
             n = int(p.exp)
-            if n>0:
-                if isinstance(p.base, Symbol):
-                    return [(1,n)]
-                else:
-                    # FIXME The return value isn't correct, but at least it
-                    #       doesn't break is_poly
-                    get_poly(p.base, x)
-                    return [(1,n)]
+            if n>0 and isinstance(p.base, Symbol):
+                return [(1,n)]
     if isinstance(p,Add):
         a,b = p.getab()
         r = get_poly(a,x) + get_poly(b,x)

@@ -1,10 +1,6 @@
-
+from sympy.core import hashing
 from sympy.core.basic import Basic
 import decimal
-from stringPict import prettyForm, stringPict
-
-
-dummycount = 0
 
 class Number(Basic):
     """Represents any kind of number in sympy.
@@ -16,7 +12,7 @@ class Number(Basic):
 
     If you want to represent for example 1+sqrt(2), then you need to do:
 
-    Rational(1) + sqrt(Rational(2))
+    Rational(1) + Rational(2)**( Rational(1)/2 )
     """
     
     mathml_tag = "cn"
@@ -34,28 +30,13 @@ class Number(Basic):
         from functions import abs_
         return abs_(self)
     
-    def __mathml__(self):
-        import xml.dom.minidom
-        if self._mathml:
-            return self._mathml
-        dom = xml.dom.minidom.Document()
-        x = dom.createElement(self.mathml_tag)
-        x.appendChild(dom.createTextNode(str(self)))
-        self._mathml = x
-        
-        return self._mathml
-    
-    
     def diff(self,sym):
         return Rational(0)
     
     def evalf(self):
-        raise NotImplementedError("cannot evaluate %s" % self.__class__.__name__)
+        raise NotImplementedError
 
     def evalc(self):
-        return self
-
-    def doit(self):
         return self
     
 class Infinity(Number):
@@ -66,18 +47,18 @@ class Infinity(Number):
         
     Notes
     =====
-        Cannot be used in expressions like oo/oo, but can be used in some
-        very simple expressions like 1*oo
+        Cannot be used in expressions like infty/infty, but can be used in some
+        very simple expressions like 1*infty
           
         Should be used only as a Symbol, for example results of limits, integration limits etc.
-        Can however be used in comparisons, like oo!=1, or oo!=x**3
+        Can however be used in comparisons, like infty!=1, or infty!=x**3
           
     Examples
     ========
         >>> from sympy import *
         >>> x = Symbol('x')
-        >>> limit(x, x, oo)
-        Infinity()
+        >>> limit(x, x, infty)
+        Infinity
     """
     
     def __init__(self, sign=1):
@@ -85,12 +66,13 @@ class Infinity(Number):
                        is_real = False, 
                        is_commutative = False, 
                        )
-    
-    def __latex__(self):
-        return "\infty"
-    
-    def __pretty__(self):
-        return "oo"
+        
+    def hash(self):
+        if self._mhash: 
+            return self._mhash.value
+        self._mhash = hashing.mhash()
+        self._mhash.addstr(str(type(self)))
+        return self._mhash.value
     
     def sign(self):
         return self._sign
@@ -104,11 +86,8 @@ class Infinity(Number):
     
     def __gt__(self, num):
         return not self.__lt__(num)
-    
-    def evalf(self):
-        return self
 
-oo = Infinity()
+infty = Infinity()
 
 class Real(Number):
     """Represents a floating point number. It is capable of representing
@@ -135,7 +114,14 @@ class Real(Number):
             self.num = num.evalf()
         else:
             self.num = decimal.Decimal(str(float(num)))
-        self._args = [self.num]
+        
+    def hash(self):
+        if self._mhash: 
+            return self._mhash.value
+        self._mhash=hashing.mhash()
+        self._mhash.addstr(str(type(self)))
+        self._mhash.addfloat(self.num)
+        return self._mhash.value
         
     def __str__(self):
         if self.num < 0:
@@ -151,8 +137,7 @@ class Real(Number):
         return int(self.evalf())
     
     def __add__(self,a):
-        a = self.sympify(a)
-        if a.is_number:
+        if isnumber(a):
             if isinstance(a, Real):
                 return Real(self.num + a.num)
             else:
@@ -192,24 +177,6 @@ class Real(Number):
     def evalf(self):
         #evalf() should return either a float or an exception
         return self.num
-    
-    def __pretty__(self):
-        if self.num < 0:
-            f = "(%s)"
-        else:
-            f = "%s"
-        return f % (str(self.num))
-    
-    def __eq__(self, a):
-        """this is overriden because by default, a python int get's converted
-        to a Rational, so things like Real(1) == 1, would return false
-        """
-        try:
-            return decimal.Decimal(str(a)) == self.num
-        except:
-            return False
-            
-            
 
 
 class Rational(Number):
@@ -245,11 +212,18 @@ class Rational(Number):
         c = self.gcd(p,q)
         self.p = p/c*s
         self.q = q/c
-        self._args = [self.p,self.q] # needed by .hash and others. we should move [p,q] to _args
-                        # and then create properties p and q
         
     def sign(self):
         return sign(self.p)*sign(self.q)
+        
+    def hash(self):
+        if self._mhash: 
+            return self._mhash.value
+        self._mhash = hashing.mhash()
+        self._mhash.addstr(str(type(self)))
+        self._mhash.addint(self.p)
+        self._mhash.addint(self.q)
+        return self._mhash.value
         
     def gcd(self,a,b):
         """Primitive algorithm for a greatest common divisor of "a" and "b"."""
@@ -361,19 +335,10 @@ class Rational(Number):
         if isinstance(pattern, Rational):
             if self==pattern:
                 return {}
-        from addmul import Mul
-        if isinstance(pattern, Mul):
-            return Mul(Rational(1),self,evaluate = False).match(pattern,syms)
- 
         return None
-    
-    def __pretty__(self):
-        if self.q == 1: return prettyForm(str(self.p), prettyForm.ATOM)
-        else: return prettyForm(str(self.p))/prettyForm(str(self.q))
- 
    
 
-class Constant(Number):
+class Constant(Basic):
     """Mathematical constant abstract class.
     
     Is the base class for constatns such as pi or e
@@ -387,6 +352,13 @@ class Constant(Number):
        
     def eval(self):
         return self
+ 
+    def hash(self):
+        if self._mhash: 
+            return self._mhash.value
+        self._mhash = hashing.mhash()
+        self._mhash.addstr(str(type(self)))
+        return self._mhash.value
 
     def diff(self,sym):
         return Rational(0)
@@ -396,24 +368,6 @@ class Constant(Number):
 
     def __rmod__(self, a):
             raise NotImplementedError
-        
-    def match(self, pattern, syms):
-        if self == pattern:
-            return {}
-        if len(syms) == 1:
-            if pattern == syms[0]:
-                return {syms[0]: self}
-            if self == pattern:
-                return {}
-        if isinstance(pattern, Constant):
-            try:
-                return {syms[syms.index(pattern)]: self}
-            except ValueError:
-                pass
-        from addmul import Mul
-        if isinstance(pattern, Mul):
-            return Mul(Rational(1),self,evaluate = False).match(pattern,syms)
-        return None
 
 class ImaginaryUnit(Constant):
     """Imaginary unit "i"."""
@@ -465,10 +419,10 @@ class ConstPi(Constant):
         pi
 
         >>> pi()
-        3.141592653589793238462643383
+        3.14159265358979323846264338
 
-        >>> pi(precision=109)
-        3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117067982148087
+        >>> pi(precision=200)
+        3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679821480865132823066470938446095505822317253594081284811174502841027019385211055596446229489549303820
 
     """
     
@@ -477,56 +431,56 @@ class ConstPi(Constant):
                        is_commutative = True, 
                        is_real = True, 
                        )
-
+    
     def evalf(self, precision=28):
-        """
-        Compute PI to artibtrary precision using series developed by
-        Chudnovsky brothers. This series converges extraordinarily
-        rapidly, giving 14 decimal places per single iteration. 
+        """Compute Pi to the current precision.
+
+        >>> print pi.evalf()
+        3.14159265358979323846264338
         
         """
-        
-        A, B, C = 13591409, 545140134, 262537412640768000
-        D = 68925893036108889235415629824000000
-        
-        decimal.getcontext().prec = precision + 14
-        
-        r = A / decimal.Decimal(C).sqrt()
+        _pi_str = '3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117068'
+        if precision <= 100:
+            # cache for small precision 
+            return Real(_pi_str[:precision])
+        #for arbitrary precision, we use series
+        # FIXME: better algorithms are known
+        decimal.getcontext().prec = precision + 2  # extra digits for intermediate steps
+        three = decimal.Decimal(3)      # substitute "three=3.0" for regular floats
+        lasts, t, s, n, na, d, da = 0, three, 3, 1, 0, 0, 24
+        while s != lasts:
+            lasts = s
+            n, na = n+na, na+8
+            d, da = d+da, da+32
+            t = (t * n) / d
+            s += t
+        decimal.getcontext().prec -= 2
+        return Real(+s)               # unary plus applies the new precision
+        # this was a recipe taken from http://docs.python.org/lib/decimal-recipes.html
+        # don't know how fiable it is
 
-        if (precision > 14):
-            n = precision / 15 + 1
-        
-            b, c = B, C**3
-            i, u, v, s = 1, 7, 4, -1
-            f_6, f_3, f_1 = 720, 6, 1
-
-            while i <= n:
-                r += (s * f_6 * (A + b)) / (f_1**3 * f_3 * decimal.Decimal(c).sqrt())
-
-                for k in range(u, u+6):
-                    f_6 *= k
-                
-                for k in range(v, v+3):
-                    f_3 *= k
-
-                u, v = u+6, v+3
-                b, i = b+B, i+1
-                
-                c, s, f_1 = c*D, s*(-1), f_1*i
-                
-        r = 1 / (12 * r)
-                
-        decimal.getcontext().prec -= 14
-
-        return Real(+r) 
 
     def __str__(self):
         return "pi"
-    
-    def __pretty__(self):
-        return prettyForm("pi", unicode=u"\u03C0", binding=prettyForm.ATOM)
 
 pi=ConstPi()
+
+def isnumber(x):
+    """DEPRECATED"""
+    #don't use this function. Use x.is_number instead
+    #everything in sympy should be subclasses of Basic anyway.
+
+    #if you need the testig for int, float, etc., just do it locally in your
+    #class, or even better, call Basic.sympify(x).is_number.
+    #so that all the code which converts from python to sympy is localised in 
+    #sympify
+    from numbers import Number
+    from basic import Basic
+    from decimal import Decimal
+    if isinstance(x, (Number, int, float, long, Decimal)):
+        return True
+    assert isinstance(x, Basic)
+    return x.is_number
 
 def sign(x):
     """Return the sign of x, that is, 

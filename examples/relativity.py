@@ -1,12 +1,8 @@
-"""
-This example calculates the Ricci tensor from the metric and does this
-on the example of Schwarzschild solution.
-"""
 import sys
 sys.path.append(".")
 sys.path.append("..")
 
-from sympy import exp, Symbol, sin, Rational, Derivative, dsolve
+from sympy import exp, Symbol, sin, Rational, Derivative
 
 from sympy.core import Basic, Function
 from sympy.modules.matrices import Matrix
@@ -88,12 +84,10 @@ def curvature(Rmn):
 class nu(Function):
     def getname(self):
         return r"\nu"
-        return r"nu"
 
 class lam(Function):
     def getname(self):
         return r"\lambda"
-        return r"lambda"
 
 t=Symbol("t")
 r=Symbol("r")
@@ -133,41 +127,28 @@ X=(t,r,theta,phi)
 Gamma=G(g,X)
 Rmn=Ricci(Riemann(Gamma,X),X)
 
-if __name__ == "__main__":
-    #print g
-    print "-"*40
-    print "Christoffel symbols:"
-    print Gamma.udd(0,1,0)
-    print Gamma.udd(0,0,1)
-    print
-    print Gamma.udd(1,0,0)
-    print Gamma.udd(1,1,1)
-    print Gamma.udd(1,2,2)
-    print Gamma.udd(1,3,3)
-    print
-    print Gamma.udd(2,2,1)
-    print Gamma.udd(2,1,2)
-    print Gamma.udd(2,3,3)
-    print
-    print Gamma.udd(3,2,3)
-    print Gamma.udd(3,3,2)
-    print Gamma.udd(3,1,3)
-    print Gamma.udd(3,3,1)
-    print "-"*40
-    print "Ricci tensor:"
-    print Rmn.dd(0,0)
-    e =  Rmn.dd(1,1)
-    print e
-    print Rmn.dd(2,2)
-    print Rmn.dd(3,3)
-    #print
-    #print "scalar curvature:"
-    #print curvature(Rmn)
-    print "-"*40
-    print "solve the Einstein's equations:"
-    e = e.subs(nu(r), -lam(r))
-    l =  dsolve(e, [lam(r)])
-    print lam(r)," = ",l
-    metric = gdd.subs(lam(r), l).subs(nu(r),-l).combine()
-    print "metric:"
-    print metric
+#print g
+print Gamma.udd(0,1,0)
+print Gamma.udd(0,0,1)
+print
+print Gamma.udd(1,0,0)
+print Gamma.udd(1,1,1)
+print Gamma.udd(1,2,2)
+print Gamma.udd(1,3,3)
+print
+print Gamma.udd(2,2,1)
+print Gamma.udd(2,1,2)
+print Gamma.udd(2,3,3)
+print
+print Gamma.udd(3,2,3)
+print Gamma.udd(3,3,2)
+print Gamma.udd(3,1,3)
+print Gamma.udd(3,3,1)
+print "-"*40
+print Rmn.dd(0,0)#.print_pygame()
+print Rmn.dd(1,1)#.print_pygame()
+print Rmn.dd(2,2)#.print_pygame()
+print Rmn.dd(3,3)#.print_pygame()
+#print "scalar curvature:"
+#print curvature(Rmn)
+#print R.print_pygame()

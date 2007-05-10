@@ -1,25 +1,7 @@
-"""
-install TeX and these Debian packages: python-pygame, python-pexpect, dvipng
-
-To view the equation in the evince:
-
->>> printing.view(1/log(x))
->>> 
-
-You can use any other viewer:
-
->>> printing.view(1/log(x), psviewer = "kpdf")
->>>
-
-Finally, you can view the equation in the pygame window:
-
->>> printing.print_pygame(1/log(x))
->>> 
-
-"""
+#install TeX and these Debian packages: python-pygame, python-pexpect, dvipng
+#
 
 import tempfile
-from sympy.modules.printing import latex
 
 def print_pygame(st):
 
@@ -28,9 +10,6 @@ def print_pygame(st):
     except ImportError:
         print "Pygame is not installed. In Debian, install the " \
             "python-pygame package."
-        return
-
-    st = latex(st)
 
     from pygame import QUIT, KEYDOWN, K_ESCAPE, K_q
     pygame.font.init()
@@ -58,9 +37,6 @@ def print_pygame(st):
                 return
 
 def tex2png(eq,pygame):
-    """
-    Accepts a latex equation in "eq" and returns an image with this equation.
-    """
     #http://www.fauskes.net/nb/htmleqII/
     import os, sys
 
@@ -70,13 +46,13 @@ def tex2png(eq,pygame):
     tex_preamble = r"""\nopagenumbers
 """
 
-    x = tempfile.mktemp()
-    tmp1 = '%s.tex'%x
+    tmp1 = tempfile.mktemp()
+    #texfn = '/tmp/x.tex'
 
     # create a LaTeX document and insert equations
     f = open(tmp1,'w')
     f.write(tex_preamble)
-    f.write(r"""$%s$
+    f.write(r"""$$%s$$
 \vfill
 \eject
 """ % eq)
@@ -87,63 +63,20 @@ def tex2png(eq,pygame):
     # compile LaTeX document. A DVI file is created
     cwd = os.getcwd()
     os.chdir("/tmp")
-    pexpect.run('tex %s' % tmp1)
+    pexpect.run('tex %s' % texfn)
 
     # Run dvipng on the generated DVI file. Use tight bounding box. 
     # Magnification is set to 1200
-    # currently, the dvipng is broken on debian.....
     cmd = "dvipng -T tight -x 1728 -z 9 -bg transparent " \
-    + "-o %s.png %s.dvi" % (x,x)
+    + "-o x.png /tmp/x.dvi" 
     pexpect.run(cmd) 
-    image = pygame.image.load("%s.png" % x)
+    image = pygame.image.load("/tmp/x.png")
 
     #remove temporary files
-    os.remove("%s.tex" % x)
-    os.remove("%s.dvi" % x)
-    os.remove("%s.log" % x)
-    os.remove("%s.png" % x)
+    os.remove("/tmp/x.tex")
+    os.remove("/tmp/x.dvi")
+    os.remove("/tmp/x.log")
+    os.remove("/tmp/x.png")
     os.chdir(cwd)
 
     return image
-
-def view(eq, psviewer = "evince"):
-    """Launches a *.ps viewer (default: evince) with the equation.
-    """
-
-    import os, sys
-
-    import pexpect
-
-    tex_preamble = r"""\nopagenumbers
-"""
-
-    x = tempfile.mktemp()
-    tmp1 = '%s.tex'%x
-
-    # create a LaTeX document and insert equations
-    f = open(tmp1,'w')
-    f.write(tex_preamble)
-    f.write(r"""$%s$
-\vfill
-\eject
-""" % latex(eq))
-    # end LaTeX document    
-    f.write(r'\bye')
-    f.close()
-
-    # compile LaTeX document. A DVI file is created
-    cwd = os.getcwd()
-    os.chdir("/tmp")
-    pexpect.run('tex %s' % tmp1)
-
-    cmd = "dvips %s.dvi" % (x)
-    pexpect.run(cmd) 
-
-    #remove temporary files
-    os.remove("%s.tex" % x)
-    os.remove("%s.dvi" % x)
-    os.remove("%s.log" % x)
-    os.chdir(cwd)
-
-
-    os.system("%s %s.ps &" % (psviewer, x))

@@ -1,10 +1,9 @@
+import hashing
+from basic import Basic
+from numbers import Rational
+#from prettyprint import StringPict
 
-from sympy.core.hashing import mhash
-from sympy.core.basic import Basic
-from sympy.core.numbers import Rational
-from sympy.core.stringPict import prettyForm
-
-dummycount = 0
+dummycount=0
 
 class Symbol(Basic):
     """
@@ -22,12 +21,9 @@ class Symbol(Basic):
     """
     
     mathml_tag = "ci"
-    
-    dummy_num = 0
 
-    def __init__(self, name, commutative=True, dummy=False, real=False, 
-                 *args, **kwargs):
-        """if dummy == True, then this Symbol is totally unique, i.e.::
+    def __init__(self, name, dummy=False, *args, **kwargs):
+        """if dummy==True, then this Symbol is totally unique, i.e.::
         
         >>> Symbol("x") == Symbol("x")
         True
@@ -40,9 +36,7 @@ class Symbol(Basic):
         """
         
         self._assumptions = {
-                         'is_commutative' : commutative,
-                         'is_dummy': dummy, 
-                         'is_real': real, 
+                         'is_commutative' : True, 
                          }
         
         for k in kwargs.keys():
@@ -50,48 +44,33 @@ class Symbol(Basic):
         
         Basic.__init__(self, **self._assumptions)
         self.name = name
-        if self.is_dummy:
+        self.dummy = dummy
+        if dummy:
             global dummycount
-            self.dummy_num = dummycount
-            dummycount += 1
-        #self._args = [name]
+            dummycount+=1
+            self.dummycount=dummycount
 
     def __str__(self):
-        if not self.is_dummy:
-            return str(self.name)
-        else:
-            # if x is dummy
-            return str(self.name + '__' + str(self.dummy_num))
-        
-    def __mathml__(self):
-        import xml.dom.minidom
-        if self._mathml:
-            return self._mathml
-        dom = xml.dom.minidom.Document()
-        x = dom.createElement(self.mathml_tag)
-        x.appendChild(dom.createTextNode(self.name))
-        self._mathml = x
-        
-        return self._mathml
+        return str(self.name)
+    
+    def __getitem__(self, iter):
+        return (self,)[iter]
 
     def hash(self):
         if self._mhash: 
             return self._mhash.value
-        self._mhash = mhash()
-        self._mhash.addstr(self.__class__.__name__)
+        self._mhash = hashing.mhash()
+        self._mhash.addstr(str(type(self)))
         self._mhash.addstr(self.name)
-        if self.is_dummy:
-            global dummycount
-            self._mhash.value += dummycount
-            dummycount += 1
+        if self.dummy:
+            self._mhash.addint(self.dummycount)
         return self._mhash.value
-    
 
     def diff(self,sym):
         if not self.is_commutative:
             raise NotImplementedError("Differentiation of non-commutative objects. " + \
                                       + "Doesn't have a meaning.")
-        if self == sym:
+        if self.isequal(sym):
             return Rational(1)
         else:
             return Rational(0)
@@ -100,9 +79,6 @@ class Symbol(Basic):
         if self.is_real:
             return self
         raise NotImplementedError
-
-    def doit(self):
-        return self
 
     def match(self, pattern, syms):
         if self == pattern:
@@ -121,62 +97,8 @@ class Symbol(Basic):
         if isinstance(pattern, Mul):
             return Mul(Rational(1),self,evaluate = False).match(pattern,syms)
         return None
-    
-    def __pretty__(self): 
-        return prettyForm(self.name, binding=prettyForm.ATOM)
-
 
 class Order(Basic):
-    """
-    Represents O(f(x)) at the point x = 0.
-
-    Definition
-    ==========
-
-    g(x) = O(f(x)) as x->a  if and only if
-    |g(x)|<=M|f(x)| near x=a                     (1)
-
-    In our case Order is for a=0. An equivalent way of saying (1) is:
-
-    lim_{x->a}  |g(x)/f(x)|  < oo
-    
-    Let's illustrate it on the following example:
-
-    sin x = x - x**3/3! + O(x**5)
-
-    where in this case O(x**5) = x**5/5! - x**7/7! + .... and the definition
-    of O means:
-
-    |x**5/5! - x**7/7! + ....| <= M|x**5|      near x=0
-
-    or equivalently:
-
-    lim_{x->0} |x**5/5! - x**7/7! + .... / x**5| < oo
-
-    which surely is true, because 
-    
-    lim_{x->0} |x**5/5! - x**7/7! + .... / x**5| = 1/5!
-
-
-    So intuitively O(x**3) means (in our case): all terms x**3, x**4 and
-    higher. But not x**2, x or 1.
-
-    Examples:
-    =========
-    >>> from sympy import *
-    >>> x = Symbol("x")
-    >>> Order(x)
-    O(x)
-    >>> Order(x)*x
-    O(x**2)
-    >>> Order(x)-Order(x)
-    O(x)
-
-       External links
-       --------------
-
-         U{Big O notation<http://en.wikipedia.org/wiki/Big_O_notation>}
-    """
 
     def __init__(self, f):
         """O(f) at the point x = 0"""
@@ -185,17 +107,25 @@ class Order(Basic):
 
     def eval(self):
         from addmul import Mul, Add
-        from numbers import Real, Rational
+        from numbers import Number
         f = self[0]
         if isinstance(f, Mul):
-            if isinstance(f[0], (Real, Rational)):
+            if isinstance(f[0],Number):
                 assert len(f[:]) == 2
                 return Order(f[1])
         if isinstance(f, Add):
-            if isinstance(f[0], (Real, Rational)):
+            if isinstance(f[0],Number):
                 assert len(f[:]) == 2
                 return Order(f[1])
         return self
+
+    def hash(self):
+        if self._mhash: 
+            return self._mhash.value
+        self._mhash = hashing.mhash()
+        self._mhash.addstr(str(type(self)))
+        self._mhash.addint(self[0].hash())
+        return self._mhash.value
 
     def __str__(self):
         return "O(%s)"%str(self[0])
@@ -210,26 +140,10 @@ class Order(Basic):
 
     @staticmethod
     def addeval(x, y):
-        from power import pole_error
         if isinstance(x, Order) and isinstance(y, Order):
-            #this doesn't seem to happen (if it does, just implement it)
             raise NotImplementedError()
         if isinstance(x, Order):
-            #calculate inf (True if this limit is oo):
-            #inf = lim_{x->a}  |g(x)/f(x)| == oo
-            inf = False
-            try:
-                #we don't want to depend on the limit module, thus
-                #we use the pole_error way, which works in most cases
-                (y/x[0]).subs(Symbol("x"),0)
-            except pole_error:
-                inf = True
-
-            if inf:
-                return None
-            else:
-                return Order(x[0])
-
+            return Order(x[0]+y)
         if isinstance(y, Order):
-            return Order.addeval(y,x)
+            return Order(x+y[0])
         return None

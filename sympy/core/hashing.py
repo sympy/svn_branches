@@ -5,17 +5,18 @@ usage:
     >>> h = mhash()
     >>> h.addint(15)
     >>> h.addstr("hey man!")
+    >>> h.addfloat(45.3)
     >>> print h.value
-    322055065595394571600238891420261570520
+    1550928569
     
 mhash.value contains the hash value which is generally a long int, that
 depends on the order of objects added. 
 """
 
 def mhash():
-    return Mmd5()
+    #return Mmd5()
     #return Mbernstein()
-    #return Mpython()
+    return Mpython()
 
 class HashAlgorithm(object):
     """Abstract class for varios implementatios of a hash algorithm"""
@@ -24,6 +25,10 @@ class HashAlgorithm(object):
         """add an integer to the hash"""
         self.add(num)
 
+    def addfloat(self, num):
+        """Add a foat to the hash"""
+        self.add(hash(num))
+        
     def add(self, other):
         """Add an object to the hash"""
         raise NotImplementedError

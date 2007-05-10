@@ -38,7 +38,7 @@ interpreter:
     >>> x = Symbol('x')
     >>> e = 1/cos(x)
     >>> print e.series(x,10)
-    1+1/2*x**2+50521/3628800*x**10+5/24*x**4+61/720*x**6+277/8064*x**8
+    1+50521/3628800*x**10+61/720*x**6+1/2*x**2+5/24*x**4+277/8064*x**8
 
 For full documentation, see the docs at our web page:
 U{http://code.google.com/p/sympy/wiki/Documentation}
@@ -58,15 +58,18 @@ G{packagetree sympy}
 __version__ = "0.4-pre"
 
 from sympy.core import Basic
-from sympy.core import Symbol, Number, Rational, Real, oo, Order
-from sympy.core import pi, I, Add, Mul
-from sympy.core.functions import Function, diff, Derivative, exp, log, sign, sqrt
+from sympy.core import Symbol, Number, Rational, Real, exp, log, sign, infty
+from sympy.core import pi, I, Order, Add, Mul
+from sympy.core.functions import Function, Derivative
 
 from sympy.modules.limits import limit, limitinf
-from sympy.modules.trigonometric import sin, cos, tan, atan
+from sympy.modules.trigonometric import sin, cos, tan, arctan
 from sympy.modules.integrals import integrate
 from sympy.modules.matrices import Matrix
 from sympy.modules.solvers import solve, dsolve
-from sympy.modules.simplify import ratsimp, simplify
 
-from sympy.modules.printing import pretty_print, pprint
+# try to import optinal modules
+try: 
+    from sympy.modules.printing import print_gtk
+except ImportError:
+    pass

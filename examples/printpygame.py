@@ -2,7 +2,7 @@ import sys
 sys.path.append("..")
 sys.path.append(".")
 
-from sympy import exp,log,Symbol,oo,Rational,sin,cos,limit,I,pi,Mul
+from sympy import exp,log,Symbol,infty,Rational,sin,cos,limit,I,pi,Mul
 from sympy.core import basic
 
 x=Symbol("x") 
@@ -16,8 +16,8 @@ def p():
     print sin(x)/(cos(x)**2 * x**x +(2*y))
 
     print sin(x**2+exp(x))
-    print sqrt(exp(x))
-    print sqrt(exp(x))
+    print exp(x).sqrt()
+    print exp(x).sqrt().sqrt()
 
     #print (1/cos(x)).series(x,10)
 

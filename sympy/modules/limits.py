@@ -12,11 +12,11 @@ All functions are sorted according to how rapidly varying they are at infinity
 using the following rules. Any two functions f and g can be compared using the
 properties of L:
 
-L=lim  log|f(x)| / log|g(x)|           (for x -> oo) 
+L=lim  log|f(x)| / log|g(x)|           (for x -> infty) 
 
 We define >, < ~ according to::
     
-    1. f > g .... L=+-oo 
+    1. f > g .... L=+-infty 
     
         - f is greater than any power of g
         - f is more rapidly varying than g
@@ -27,7 +27,7 @@ We define >, < ~ according to::
     
         - f is lower than any power of g
     
-    3. f ~ g .... L!=0,+-oo 
+    3. f ~ g .... L!=0,+-infty 
     
         - both f and g are bounded from above and below by suitable integral powers
         of the other
@@ -58,11 +58,11 @@ set w=exp(-2x) or w=exp(-3x) ...). We rewrite the mrv set using w, in our case
 
     f = c0*w^e0 + c1*w^e1 + ... + O(w^en),        where e0<e1<...<en, c0!=0
 
-but for x->oo, lim f = lim c0*w^e0, because all the other terms go to zero,
+but for x->infty, lim f = lim c0*w^e0, because all the other terms go to zero,
 because w goes to zero faster than the ci and ei. So::
 
     for e0>0, lim f = 0
-    for e0<0, lim f = +-oo   (the sign depends on the sign of c0)
+    for e0<0, lim f = +-infty   (the sign depends on the sign of c0)
     for e0=0, lim f = lim c0
 
 We need to recursively compute limits at several places of the algorithm, but
@@ -75,8 +75,8 @@ mrv(e,x) returns the list of most rapidly varying (mrv) subexpressions of "e"
 rewrite(e,Omega,x,wsym) rewrites "e" in terms of w
 leadterm(f,x) returns the lowest power term in the series of f
 mrvleadterm(e,x) returns the lead term (c0,e0) for e
-limitinf(e,x) computes lim e  (for x->oo)
-limit(e,z,z0) computes any limit by converting it to the case x->oo
+limitinf(e,x) computes lim e  (for x->infty)
+limit(e,z,z0) computes any limit by converting it to the case x->infty
 
 all the functions are really simple and straightforward except rewrite(),
 which is the most difficult part of the algorithm.
@@ -85,7 +85,7 @@ which is the most difficult part of the algorithm.
 
 import sympy as s
 from sympy.core import Basic, mhash
-from sympy.core.stringPict import stringPict, prettyForm
+#from sympy.core.prettyprint import StringPict
 
 from decorator import decorator
 
@@ -179,30 +179,30 @@ def union(a,b):
 #@decorator(maketree)
 @memoize
 def limitinf(e,x):
-    """Limit e(x) for x-> oo"""
+    """Limit e(x) for x-> infty"""
     if not e.has(x): return e #e is a constant
     c0,e0 = mrv_leadterm(e,x) 
     sig=sign(e0,x)
     if sig==1: return s.Rational(0) # e0>0: lim f = 0
     elif sig==-1: 
-        s.oo.sig=sign(c0,x)
+        s.infty.sig=sign(c0,x)
 #uncommenting this line shows, what's happening:
-#        print "LL",s.oo, sign(c0,x), sign(c0, x) * s.oo
-        return s.oo #e0<0: lim f = +-oo   (the sign depends on the sign of c0)
+#        print "LL",s.infty, sign(c0,x), sign(c0, x) * s.infty
+        return s.infty #e0<0: lim f = +-infty   (the sign depends on the sign of c0)
 #this doesn't work:
-#        return sign(c0, x) * s.oo #e0<0: lim f = +-oo   (the sign depends on the sign of c0)
+#        return sign(c0, x) * s.infty #e0<0: lim f = +-infty   (the sign depends on the sign of c0)
     elif sig==0: return limitinf(c0,x) #e0=0: lim f = lim c0
 
 @memoize
 def sign(e,x):
-    """Returns a sign of an expression at x->oo.
+    """Returns a sign of an expression at x->infty.
     
         e>0 ... 1
         e==0 .. 0
         e<0 ... -1
     """
     #print "sign:",e
-    if isinstance(e, (s.Rational, s.Real)):
+    if isinstance(e,s.core.Number):
         return s.sign(e)
     elif not e.has(x):
         return e.evalf() > 0
@@ -224,7 +224,7 @@ def sign(e,x):
     elif isinstance(e, s.core.Add):
         #print limitinf(e,x) 
         #print sign(limitinf(e,x),x) 
-        return sign(limitinf(e,x),x) #FIXME this is wrong for -oo
+        return sign(limitinf(e,x),x) #FIXME this is wrong for -infty
     raise "cannot determine the sign of %s"%e
 
 def tryexpand(a):
@@ -252,7 +252,7 @@ def rewrite(e,Omega,x,wsym):
     g=Omega[-1] #g is going to be the "w" - the simplest one in the mrv set
     assert isinstance(g,s.exp) #all items in Omega should be exponencials
     sig= (sign(g._args,x)==1) 
-    if sig: wsym=1/wsym #if g goes to oo, substitute 1/w
+    if sig: wsym=1/wsym #if g goes to infty, substitute 1/w
     #O2 is a list, which results by rewriting each item in Omega using "w"
     O2=[]
     for f in Omega: 
@@ -281,11 +281,11 @@ def movedown(l,x):
 
 def subexp(e,sub):
     """Is "sub" a subexpression of "e"? """
-    n = s.Symbol("x", dummy=True)
+    n=s.Symbol("x",True)
     #we substitute some symbol for the "sub", and if the 
     #expression changes, the substitution was successful, thus the answer
     #is yes.
-    return e.subs(sub,n) != e
+    return e.subs(sub,n)!=e
 
 #@decorator(maketree)
 def mrv_leadterm(e,x,Omega=[]):
@@ -296,7 +296,7 @@ def mrv_leadterm(e,x,Omega=[]):
         Omega = mrv(e,x)
     if member(x,Omega):
         return movedown(mrv_leadterm(moveup([e],x)[0],x,moveup(Omega,x)),x)
-    wsym = s.Symbol("w", dummy=True)
+    wsym = s.Symbol("w",True)
     f,logw=rewrite(e,Omega,x,wsym)
     series=f.expand().series(wsym,1)
     n = 2
@@ -327,7 +327,7 @@ def mrv(e,x):
     elif isinstance(e, s.log): 
         return mrv(e._args, x)
     elif isinstance(e, s.exp): 
-        if limitinf(e._args,x) == s.oo:
+        if limitinf(e._args,x) == s.infty:
             return max([e],mrv(e._args, x), x)
         else:
             return mrv(e._args,x)
@@ -357,81 +357,55 @@ def compare(a,b,x):
     """Returns "<" if a<b, "=" for a==b, ">" for a>b"""
     c=limitinf(s.log(a)/s.log(b),x)
     if c==s.Rational(0): return "<"
-    elif c==s.oo: return ">"
+    elif c==s.infty: return ">"
     else: return "="
 
 class Limit(Basic):
-    
-    mathml_tag = 'limit'
 
     def __init__(self,e,x,x0):
         Basic.__init__(self)
-        self._args = list()
-        self._args.append(self.sympify(e))
-        self._args.append(self.sympify(x))
-        self._args.append(self.sympify(x0))
-        
-
-    def __pretty__(self):
-         e, x, t = [a.__pretty__() for a in (self.e,self.x,self.x0)]
-         a = prettyForm('lim')
-         a = prettyForm(*a.below('%s->%s' % (x, t)))
-         a = prettyForm(*stringPict.next(a, e))
-         return a
-     
-    def __latex__(self):
-         return "\lim_{%s \to %s}%s" % (self.x.__latex__(), \
-                                                 self.x0.__latex__(), 
-                                                 self.e.__latex__() )
-                 
-    @property
-    def e(self):
-        return self._args[0]
-    
-    @property
-    def x(self):
-        return self._args[1]
-    
-    @property
-    def x0(self):
-        return self._args[2]
+        self.e=self.sympify(e)
+        self.x=self.sympify(x)
+        self.x0=self.sympify(x0)
 
     def doit(self):
         return limit(self.e,self.x,self.x0)
+
+    def hash(self):
+        if self._mhash: 
+            return self._mhash.value
+        self._mhash = mhash()
+        self._mhash.addstr(str(type(self)))
+        self._mhash.addint(self.e.hash())
+        self._mhash.addint(self.x.hash())
+        self._mhash.addint(self.x0.hash())
+        return self._mhash.value
     
-    def __mathml__(self):
-        if self._mathml:
-            return self._mathml
-        import xml.dom.minidom
-        dom = xml.dom.minidom.Document()
-        x = dom.createElement("apply")
-        x.appendChild(dom.createElement(self.mathml_tag))
-        
-        x_1 = dom.createElement('bvar')
-        
-        x_2 = dom.createElement('lowlimit')
-        
-        x.appendChild(x_1)
-        x.appendChild(x_2)
-        x.appendChild( self.e.__mathml__() )
-        x.childNodes[1].appendChild( self.x.__mathml__() )
-        x.childNodes[2].appendChild( self.x0.__mathml__() )
-        self._mathml = x
-        
-        return self._mathml
-            
+    @property
+    def mathml(self):
+        s = "<apply><limit/><bvar>" + self.x.mathml + "</bvar>"
+        s += "<lowlimit>" + self.x0.mathml + "</lowlimit>"
+        s += self.e.mathml
+        s += "</apply>"
+        return s
+    
+    def print_pretty(self):
+         e, x, t = [a.print_pretty() for a in (self.e,self.x,self.x0)]
+         return StringPict('lim').below(StringPict.next(x, '->', t)) \
+                 .right(' ', e)
+
 def limit(e,z,z0, evaluate=True):
     """Compute the limit of e(z) at the point z0. 
-        z0 can be oo
+        z0 can be infty
         Currently only limit z->z0+"""
     if not isinstance(z, s.Symbol):
         raise NotImplementedError("Second argument must be a Symbol")
     if not evaluate:
         return Limit(e, z, z0)
-    if z0 == s.oo:
+    if z0 == s.infty:
         return limitinf(e, z)
-    if z0 == -s.oo:
+    if z0 == -s.infty:
         return limitinf(-e, z)
-    x=s.Symbol("x", dummy=True)
+    x=s.Symbol("x",True)
     e0=e.subs(z,z0+1/x)
     return limitinf(e0,x)

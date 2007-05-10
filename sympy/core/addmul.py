@@ -5,11 +5,10 @@ the classes Add, Mul and it's base class, Pair.
 This is a central part of the core
 """
 
+import hashing
 from sympy.core.basic import Basic
-from sympy.core.numbers import Rational, Real, Infinity
+from sympy.core.numbers import Number, Rational, Real, Infinity
 from sympy.core.power import Pow, pole_error
-
-from sympy.core.stringPict import prettyForm
 
 class Pair(Basic):
     """Abstract class containing common code to Add and Mul classes.
@@ -21,20 +20,27 @@ class Pair(Basic):
         for arg in args:
             assert isinstance(arg, Basic)
         self._args = args
-        
-    def __mathml__(self):
-        """Returns a MathML expression representing the current object"""
-        import xml.dom.minidom
-        if self._mathml:
-            return self._mathml
-        dom = xml.dom.minidom.Document()
-        x = dom.createElement('apply')
-        x_1 = dom.createElement(self.mathml_tag)
-        x.appendChild(x_1)
-        for arg in self._args:
-            x.appendChild( arg.__mathml__() )
-        self._mathml = x
-        return self._mathml
+
+    def __lt__(self, a):
+        return self.evalf() < a
+    
+    @property
+    def mathml(self):
+        s = "<apply>" + "<" + self.mathml_tag + "/>"
+        for a in self._args:
+            s += a.mathml
+        s += "</apply>"
+        return s
+    
+    def hash(self):
+        if self._mhash:
+            return self._mhash.value
+        self._mhash = hashing.mhash()
+        self._mhash.addstr(str(type(self)))
+        for i in self[:]:
+            self._mhash.add(i.hash())
+        return self._mhash.value
+
     
     def tryexpand(self, a):
         if isinstance(a,Mul) or isinstance(a,Pow):
@@ -82,7 +88,7 @@ class Pair(Basic):
         n = default
         b = []
         for x in a:
-            if isinstance(x,(Real, Rational)):
+            if isinstance(x,Number):
                 n = action(n,x)
             else:
                 b.append(x)
@@ -112,38 +118,15 @@ class Pair(Basic):
     @property        
     def is_commutative(self):
         for x in self[:]:
-            #checks wether all arguments are commutative
             if not x.is_commutative:
                 return False
         return True
 
-    def match(self, pattern, syms=None, exclude = "None"):
-        """
-        Imagine that we are matching (3*x**2).match(a*x,[a])
-
-        The optional parameter "exclude" is a list of variables ("x") that we
-        don't want to occur in the "a". This way, the user can specify, what
-        kind of matches he is interested in. The default behavior (if the user
-        doesn't specify this argument, i.e. exclude = "None") is:
-
-            1)if there is just one more variable besides the matched ones, for
-            example "x", then exclude = x.
-
-            2)otherwise exclude=None, which means, that 
-            Rational(2).match(a*x,[a],exlude = None) returns {a: 2/x}
-
-        """
-        #print self, pattern, syms
-        from sympy.core.symbol import Symbol
-        from sympy.core.numbers import Constant
+    def match(self, pattern, syms=None):
+        from symbol import Symbol
         if syms == None:
             syms = pattern.atoms(type=Symbol)
             #print syms
-        if exclude == "None":
-            #extract the rest of the symbols in pattern (excluding syms)
-            exclude = list(set(pattern.atoms(type=Symbol))-set(syms))
-            if exclude == []:
-                exclude = None
         if len(syms) == 1:
             if pattern.has(syms[0]):
                 if pattern == syms[0]:
@@ -153,7 +136,7 @@ class Pair(Basic):
                     return {}
                 else:
                     return None
-        if isinstance(pattern, (Symbol, Constant)):
+        if isinstance(pattern, Symbol):
             try:
                 return {syms[syms.index(pattern)]: self}
             except ValueError:
@@ -165,46 +148,31 @@ class Pair(Basic):
         global_wildcard = None
         for p in pat:
             if p in syms:
+                if global_wildcard:
+                    #unpredictable result, do we really need this?
+                    #currently this can never happen, I added the "break"
+                    #below....
+                    raise "Can't have more than 1 global wildcards"
                 global_wildcard = p
                 break
         if global_wildcard:
             pat.remove(global_wildcard)
-        #print ops,pat
-        r2 = dict()
+        r2 = {}
         for p in pat:
             for o in ops:
-                if isinstance(o,Pair):
-                    r = o.match(p,syms, exclude = exclude)
-                else:
-                    r = o.match(p,syms)
+                r = o.match(p,syms)
                 #print o,p,syms,"->",r
                 if r!= None:
                     ops.remove(o)
                     break
             if r == None:
-                #print self, pattern, ops, pat
-                if type(self) == type(pattern):
-                    if isinstance(self,Mul):
-                        r = (self/p).match(pattern/p, syms)
-                        #print "  ",r
-                        if exclude:
-                            if r:
-                                for x in r:
-                                    if r[x].has(exclude[0]):
-                                        return None
-                                    if len(exclude) == 2:
-                                        if r[x].has(exclude[1]):
-                                            return None
-                        return r
                 return None
             r2.update(r)
         if global_wildcard:
             if len(ops) == 0:
-                #return None
-                if isinstance(self, Add):
-                    rst = Rational(0)
-                else:
-                    rst = Rational(1)
+                return None
+            elif len(ops) == 1:
+                rst = ops[0]
             else:
                 rst = type(self)(*ops)
             r2.update({global_wildcard: rst})
@@ -226,52 +194,14 @@ class Mul(Pair):
             elif a[0].isone():
                 f = ""
                 a = self._args[1:]
-
-        num = [] # items in numerator
-        den = [] # items in denominator
-        for x in a:
-            if isinstance(x, Pow) and x.exp == -1:
-                if isinstance(x.base, Pair):
-                    den.append( "(" + str(x.base) + ")" )
-                else:
-                    den.append( str(x.base) )
-            else:
-                if isinstance(x, Pair):
-                    num.append( "(" + str(x) + ")" )
-                else:
-                    num.append( str(x) )
-
-        snum = str.join('*', num)
-        if len(den) == 0:
-            return "%s%s" % (f, snum)
-        else:
-            sden = str.join('*', den)
-            if len(den) > 1: sden = "(" + sden + ")"
-            return "%s%s/%s" % (f, snum, sden)
-    
-    def __float__(self):
-        a = 1
-        for arg in self._args[:]:
-            a *= float(arg)
-        return a
-
-    def __latex__(self):
-        f = ""
-        a = self._args
-        if isinstance(a[0],Rational):
-            if a[0].isminusone():
-                f = "-"
-                a = self.args[1:]
-            elif a[0].isone():
-                f = ""
-                a = self.args[1:]
         for x in a:
             if isinstance(x,Pair):
-                f += "(%s)"
+                f += "(%s)*"
             else:
-                f += "%s "
+                f += "%s*"
         f = f[:-1]
-        return f % tuple([x.__latex__() for x in a])
+        return f % tuple([str(x) for x in a])
+    
 
     @staticmethod
     def get_baseandexp(a):
@@ -302,15 +232,14 @@ class Mul(Pair):
             if z2:
                 return z2, True
         
-        # if it contains infinity
-        if (x.atoms(type=Infinity) != []) or y.atoms(type=Infinity) != []:
+        if isinstance(x, Infinity) or isinstance(y, Infinity):
             return x, False
 
-        if isinstance(x,(Real, Rational)) and isinstance(y, (Real, Rational)):
+        if isinstance(x,Number) and isinstance(y, Number):
             return x*y, True
         xbase,xexp = Mul.get_baseandexp(x)
         ybase,yexp = Mul.get_baseandexp(y)
-        if xbase == ybase:
+        if xbase.isequal(ybase):
             #this whole "if" is to correctly cooperate with Pow.eval()
             #so we don't get infinite recursion. It's not elegant, but it
             #works.
@@ -318,19 +247,8 @@ class Mul(Pair):
                 e = Add(xexp,yexp)
                 if e != 0:
                     return Pow(xbase,e,evaluate=False), True
+
             return Pow(xbase,Add(xexp,yexp)), True
-        elif xexp == 1 or yexp == 1 or xexp == -1 or yexp == -1:
-            return x, False
-        elif xexp.is_number and yexp.is_number:
-            if xexp == yexp:
-                return Pow(xbase*ybase, xexp, evaluate=False), True
-            elif xexp == -yexp:
-                if xexp > 0:
-                    return Pow(xbase/ybase, xexp), True
-                else:
-                    return Pow(ybase/xbase, yexp), True
-            else:
-                return x, False
         else:
             return x, False
             
@@ -404,10 +322,9 @@ class Mul(Pair):
                 if ok: return z
         a=c_part+nc_part
         #put the number in front of all the other args
-        if n != 1: 
-            a = [n]+a
+        if n != 1: a=[n]+a
         if len(a) > 1:
-            #construct self again, but non-evaluated this time
+            #construct self again, but evaluated this time
             return Mul(evaluate=False, *a)
         elif len(a) == 1:
             return a[0]
@@ -466,7 +383,7 @@ class Mul(Pair):
         except pole_error:
             y=b.series(sym,n)
             a0 = y.subs(sym,0)
-            if a0==0 and a.is_bounded:
+            if a0==0 and a.bounded():
                 return y
             #we cannot expand x*y
             raise
@@ -477,7 +394,7 @@ class Mul(Pair):
             #but if a goes to 0 and b is bounded, 
             #the result is just a*const, so we just return a
             a0 = x.subs(sym,0)
-            if a0==0 and b.is_bounded:
+            if a0==0 and b.bounded():
                 return x
             #we cannot expand x*y
             raise
@@ -487,7 +404,7 @@ class Mul(Pair):
         a,b = self.getab()
         a = self.tryexpand(a)
         b = self.tryexpand(b)
-        if isinstance(a, Add):
+        if isinstance(a,Add):
             d = Rational(0)
             for t in a[:]:
                 d += (t*b).expand()
@@ -499,23 +416,6 @@ class Mul(Pair):
             return d
         else:
             return a*b
-
-    def combine(self):
-        from functions import exp, log
-        a,b = self.getab()
-        a = a.combine()
-        b = b.combine()
-        if isinstance(a, exp) and isinstance(b, exp):
-            return exp(a[0]+b[0])
-        if isinstance(a, log):
-            return log(a[0]**b)
-        if isinstance(b, log):
-            return log(b[0]**a)
-        if isinstance(a, exp):
-            for x in b:
-                if isinstance(x, exp):
-                    return exp(a[0]+x[0])*b/x
-        return a*b
         
     def subs(self,old,new):
         a,b = self.getab()
@@ -525,21 +425,6 @@ class Mul(Pair):
         else:
             return e
 
-    def __pretty__(self):
-        a = [] # items in the numerator
-        b = [] # items that are in the denominator (if any)
-        for item in self._args:
-            if isinstance(item, Pow) and item.exp == -1:
-                b.append( item.base.__pretty__() )
-            #elif item == -1:
-             #   a.append(prettyForm("-"))
-                #pass
-            else:
-                a.append(item.__pretty__())
-        if len(b) == 0:
-            return prettyForm.__mul__(*a)
-        else:
-            return prettyForm.__mul__(*a) / prettyForm.__mul__(*b)
 
 class Add(Pair):
     """
@@ -574,13 +459,6 @@ class Add(Pair):
     
     mathml_tag = "plus"
     
-    
-    def __float__(self):
-        a = 0
-        for arg in self._args[:]:
-            a += float(arg)
-        return a  
-    
     def __str__(self):
         """Returns a string representation of the expression in self."""
         
@@ -591,23 +469,14 @@ class Add(Pair):
                 f += "%s" % str(self._args[i])
             else:
                 f += "+%s" % str(self._args[i])
-        return f
-    
-    def __latex__(self):
-        f = "%s" % self[0].__latex__()
-        for i in range(1,len(self[:])):
-            num_part = _extract_numeric(self[i])[0]
-            if num_part < 0:
-              f += "%s" % self[i].__latex__()
-            else:
-              f += "+%s" % self[i].__latex__()
         return f    
 
+                
     def getab(self):
         """Pretend that self = a+b and return a,b
         
         in general, self=a+b+c+d+..., but in many algorithms, we 
-        want to have just 2 arguments to add. Use this function to 
+        want to ha+ve just 2 arguments to add. Use this function to 
         simulate this interface. (the returned b = b+c+d.... )
         
         If you want to obtain all the arguments of a given expression, use
@@ -661,10 +530,7 @@ class Add(Pair):
             ok = False
             for y in exp:
                 bn, b = _extract_numeric(y)
-                if (not ok) and a == b:
-                    if isinstance(a, Infinity) or isinstance(b, Infinity):
-                        # case oo - oo
-                        raise ArithmeticError("Cannot compute this")
+                if (not ok) and a.isequal(b):
                     e.append(Mul(an + bn,a))
                     ok = True
                 else:
@@ -690,10 +556,8 @@ class Add(Pair):
 
         def _add_Number(a,b):
             """Adds two Real or Rational Numbers"""
-            if isinstance(a,(Real, Rational)):
-                return a + b
-            else:
-                raise ArgumentError
+            if isinstance(a,Number):
+                return a+b
         
         a = self.flatten(self._args)
         a = self.coerce(a,_add)
@@ -732,12 +596,6 @@ class Add(Pair):
         for x in self._args:
             d += self.tryexpand(x)
         return d
-
-    def combine(self):
-        r = 0
-        for x in self:
-            r+=x.combine()
-        return r
     
     def subs(self,old,new):
         d = Rational(0)
@@ -759,17 +617,13 @@ class Add(Pair):
             #there is a cancelation problem here:
             #implement the class Order
             return (a.series(sym,n)+b.series(sym,n))
-        
-    def __pretty__(self):
-        return prettyForm.__add__(*[arg.__pretty__() for arg in self._args])
-
 
 def _extract_numeric(x):
     """Returns the numeric and symbolic part of x.
     For example, 1*x -> (1,x)
     Works only with simple expressions. 
     """
-    if isinstance(x, Mul) and isinstance(x._args[0], (Rational, Real)):
+    if isinstance(x, Mul) and isinstance(x._args[0], Number):
         return x.getab()
     else:
         return (Rational(1), x)

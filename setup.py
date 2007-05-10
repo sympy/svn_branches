@@ -31,8 +31,6 @@ sympy@googlegroups.com and ask for help.
 from distutils.core import setup
 from distutils.core import Command
 import sys
-import os
-
 import sympy
 
 # Make sure I have the right Python version.
@@ -220,28 +218,6 @@ class clean(Command):
         os.system("rm -rf build")
         os.system("rm -rf dist")
 
-class gen_doc(Command):
-    """Generate the (html) api documentation using epydoc
-
-    output is sent to the directory ../api/
-    """
-    
-    description = "generate the api doc"
-    user_options = []
-    
-    target_dir = "../api/" 
-
-    def initialize_options(self):  
-        self.all = None
-    
-    def finalize_options(self):   
-        pass
-
-    def run(self):
-        import os
-        os.system("epydoc --no-frames -o %s sympy" % self.target_dir)
-
-
 class test_sympy_core(Command):
     """Run only the tests concerning features of sympy.core.
     It's a lot faster than running the complete test suite.
@@ -276,43 +252,6 @@ class test_sympy_core(Command):
             """
             sys.exit(-1)
         py.test.cmdline.main(args=self.tests_to_run)
-
-class test_sympy_dpkg(Command):
-    
-    description = "Run tests for the deb package"
-    user_options = []  # distutils complains if this is not here.
-    
-    def initialize_options(self):  # distutils wants this
-        pass
-    
-    def finalize_options(self):    # this too
-        pass
-    
-    def run(self):
-        import os
-        from glob import glob
-        g = glob("dist/*.changes")
-        assert len(g) == 1
-        changes = g[0]
-        g = glob("dist/*.dsc")
-        assert len(g) == 1
-        dsc = g[0]
-        g = glob("dist/*.deb")
-        assert len(g) == 1
-        deb = g[0]
-        print "testing this package:"
-        print "  ",dsc
-        print "  ",changes
-        print "  ",deb
-        print
-        print "running lintian & linda..."
-        os.system("lintian -i %s" % changes)
-        os.system("linda -i %s" % changes)
-        print 'running pbuilder (please run "sudo pbuilder update" yourself)...'
-        os.system("sudo pbuilder build %s" % dsc)
-        print "running piuparts"
-        os.system("sudo piuparts -p %s" % deb)
-        print "Done, see the above output for any errors."
         
 class test_sympy_doc(Command):
     
@@ -333,16 +272,11 @@ class test_sympy_doc(Command):
         
         import glob
 
-        print "Testing docstrings."
-
         files = glob.glob('sympy/*/*.py') + glob.glob('sympy/modules/*/*.py')
-        #make it work on Windows too:
-        files = [f.replace("\\","/") for f in files]
         
         # files without doctests or that don't work
         files.remove('sympy/modules/printing/pygame_.py')
         files.remove('sympy/modules/printing/pretty.py') # see issue 53
-
         
         #testing for optional libraries
         try:
@@ -351,10 +285,6 @@ class test_sympy_doc(Command):
             #remove tests that make use of libxslt1
             files.remove('sympy/modules/printing/latex.py')
             files.remove('sympy/modules/printing/__init__.py')
-        try:
-            import pylab
-        except ImportError:
-            files.remove('sympy/modules/graphing.py')
 
         modules = []
         for x in files:
@@ -395,8 +325,6 @@ setup(
                      'test_core' : test_sympy_core,
                      'test_doc' : test_sympy_doc,
                      'bdist_dpkg' : bdist_dpkg, 
-                     'test_dpkg' : test_sympy_dpkg,
-                     'gen_doc' : gen_doc,
                      'clean' : clean, 
                      },
       )
