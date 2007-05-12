@@ -1,3 +1,10 @@
+It was downloaded from http://code.google.com/p/sympy/
+The following commands will create the source package:
+
+svn checkout https://sympy.googlecode.com/svn/tags/sympy-0.4~pre+svn780 sympy
+cd sympy
+python setup.py bdist_dpkg
+
 Upstream Authors: Ondrej Certik, Fabian Seoane
 
 Copyright 2006, 2007 Ondrej Certik
@@ -26,10 +33,6 @@ This package was debianized by Fabian Seoane <fabian@fseoane.net> on
 Wed, 21 Mar 2007 13:56:19 +0100.
 
 Current maintainer is Ondrej Certik <ondrej@certik.cz>.
-
-It was downloaded from http://code.google.com/p/sympy/
-(download the svn version tags/sympy-0.4~pre+svn780 and then 
-`python setup.py bdist_dpkg`, this will create the source package)
 
 The file sympy/modules/decorator.py is Copyright Michele Simionato
 (http://www.phyast.pitt.edu/~micheles/python/documentation.html)
