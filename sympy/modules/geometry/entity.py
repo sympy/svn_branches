@@ -1,4 +1,5 @@
-from sympy import *
+from sympy import Basic, Symbol, Number, Pow, Add, Mul
+
 
 class GeometryEntity(object):
     """The base class for any geometrical entity."""

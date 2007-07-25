@@ -1,16 +1,11 @@
-#from sympy.core.function import DefinedFunction
-#from sympy.core.numbers import Number, Real, Rational, pi, I, oo
-#from sympy import Symbol, Add, Mul, Pow, Basic, exp, log, sin
-#from sympy.modules.simplify import simplify
-#from sympy import O
-#from sympy.modules.trigonometric import sin
-
-from sympy.core import *
+from sympy.core.functions import Function, exp, sqrt
+from sympy.core.numbers import Number, Real, Rational, pi, I, oo
+from sympy import Symbol, Add, Mul, Pow, Basic
+from sympy.modules.simplify import simplify
+from sympy import O
+from sympy.modules.trigonometric import sin
 
 # Factorial and gamma related functions
-
-def sqrt(arg):
-    return arg**(Rational(1,2))
 
 
 # Lanczos approximation for low-precision numerical factorial
@@ -31,7 +26,7 @@ def _lanczos(z):
         return exp(logw)
 
 
-class Factorial(DefinedFunction):
+class factorial(Function):
     """
     Usage
     =====
@@ -56,9 +51,8 @@ class Factorial(DefinedFunction):
         15/8*pi**(1/2)
 
     """
-    nofargs = 1
-
-    def _eval_apply(self, x):
+    def eval(self):
+        x = self._args
         if isinstance(x, Rational):
             if x.is_integer:
                 if x < 0:
@@ -72,6 +66,7 @@ class Factorial(DefinedFunction):
                 if n < 0:
                     return (-1)**(-n+1) * pi * x / factorial(-x)
                 return sqrt(pi) * Rational(1, 2**n) * factorial2(2*n-1)
+        return self
 
     def diff(self, sym):
         return gamma(self._args+1).diff(sym)
@@ -104,12 +99,11 @@ class Factorial(DefinedFunction):
             s = "(" + x.__latex__() + ")"
         return s + "!"
 
-
 def _fac(x):
     return factorial(x, evaluate=False)
 
 
-class Factorial2(DefinedFunction):
+class factorial2(Function):
     """
     Usage
     =====
@@ -132,9 +126,8 @@ class Factorial2(DefinedFunction):
         48
 
     """
-    nofargs = 1
-
-    def _eval_apply(self, x):
+    def eval(self):
+        x = self._args
         if isinstance(x, Rational) and x.is_integer:
             if int(x) % 2 == 0:
                 if x < 0:
@@ -146,6 +139,7 @@ class Factorial2(DefinedFunction):
                     return factorial2(x+2) / (x+2)
                 else:
                     return factorial(x) / 2**((x-1)/2) / factorial((x-1)/2)
+        return self
 
     def __latex__(self):
         x = self._args
@@ -269,7 +263,31 @@ def factorial_simplify(expr):
 
     return expr
 
-class Rising_factorial(DefinedFunction):
+
+# This class is a temporary solution
+class Function2(Function):
+
+    def __init__(self, x, y):
+        Basic.__init__(self, is_commutative=True)
+        self._args = self.sympify(x), self.sympify(y)
+
+    def atoms(self, s=[], type=None):
+        x, y = self._args
+
+        s_temp = list(set(x.atoms()) | set(y.atoms()))
+
+        if type is not None:
+            return filter(lambda x : isinstance(x, type), s_temp)
+
+        return s_temp
+
+    def subs(self, old, new):
+        x, y = self._args
+        x = x.subs(old, new)
+        y = y.subs(old, new)
+        return self.__class__(x, y)
+
+class rising_factorial(Function2):
     """
     Usage
     =====
@@ -283,9 +301,9 @@ class Rising_factorial(DefinedFunction):
         12
 
     """
-    nofargs = 2
 
-    def _eval_apply(self, x, n):
+    def eval(self):
+        x, n = self._args
         return factorial_simplify(_fac(x+n-1) / _fac(x-1))
 
     def __latex__(self):
@@ -293,7 +311,7 @@ class Rising_factorial(DefinedFunction):
         return "{(%s)}^{(%s)}" % (x.__latex__(), n.__latex__())
 
 
-class Falling_factorial(DefinedFunction):
+class falling_factorial(Function2):
     """
     Usage
     =====
@@ -307,9 +325,8 @@ class Falling_factorial(DefinedFunction):
         60
 
     """
-    nofargs = 2
-
-    def _eval_apply(self, x, n):
+    def eval(self):
+        x, n = self._args
         return factorial_simplify(_fac(x) / _fac(x-n))
 
     def __latex__(self):
@@ -317,7 +334,7 @@ class Falling_factorial(DefinedFunction):
         return "{(%s)}_{(%s)}" % (x.__latex__(), n.__latex__())
 
 
-class Binomial2(DefinedFunction):
+class binomial(Function2):
     """
     Usage
     =====
@@ -354,9 +371,8 @@ class Binomial2(DefinedFunction):
         1/6*x*(-2+x)*(-1+x)
 
     """
-    nofargs = 2
-
-    def _eval_apply(self, n, k):
+    def eval(self):
+        n, k = self._args
 
         # TODO: move these two cases to factorial_simplify as well
         if n == 0 and k != 0:
@@ -368,8 +384,7 @@ class Binomial2(DefinedFunction):
         n, k = self._args
         return r"{{%s}\choose{%s}}" % (n.__latex__(), k.__latex__())
 
-
-class Gamma(DefinedFunction):
+class gamma(Function):
     """
     Usage
     =====
@@ -392,14 +407,13 @@ class Gamma(DefinedFunction):
         pi**(1/2)
 
     """
-    nofargs = 1
 
-    def _eval_apply(self, x):
+    def eval(self):
+        x = self._args
         y = factorial(x-1)
-        try:
-            if not isinstance(y.func, Factorial):
-                return y
-        except:
+        if isinstance(y, factorial):
+            return self
+        else:
             return y
 
     def diff(self, sym):
@@ -411,32 +425,30 @@ class Gamma(DefinedFunction):
         return "\Gamma(" + self._args.__latex__() + ")"
 
 
-class LowerGamma(DefinedFunction):
+class lower_gamma(Function2):
     """
     Lower incomplete gamma function
-
+    
     gamma(a, x)
     """
-    nofargs = 2
-
-    def _eval_apply(self, a, x):
+    def eval(self):
+        a, x = self._args
         if a == 1:
             return 1 - exp(-x)
         if a.is_integer and a > 1:
             b = a-1
             return b*lower_gamma(b, x) - x**b * exp(-x)
-        #return self
+        return self
 
 
-class UpperGamma(DefinedFunction):
+class upper_gamma(Function2):
     """
     Upper incomplete gamma function
 
     Gamma(a, x)
     """
-    nofargs = 2
-
-    def _eval_apply(self, a, x):
+    def eval(self):
+        a, x = self._args
         if x == 0:
             return gamma(a)
         if a == 1:
@@ -444,14 +456,4 @@ class UpperGamma(DefinedFunction):
         if a.is_integer and a > 1:
             b = a-1
             return b*upper_gamma(b, x) + x**b * exp(-x)
-        #return self
-
-
-factorial = Factorial()
-factorial2 = Factorial2()
-rising_factorial = Rising_factorial()
-falling_factorial = Falling_factorial()
-#binomial = Binomial()
-upper_gamma = UpperGamma()
-lower_gamma = LowerGamma()
-gamma = Gamma()
+        return self

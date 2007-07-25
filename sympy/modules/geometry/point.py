@@ -1,6 +1,7 @@
-from sympy import *
+from sympy import Basic, Rational, sqrt
 from sympy.modules.simplify import simplify
 from entity import GeometryEntity
+
 
 class Point(GeometryEntity):
     """A point in space defined by a sequence of values."""
