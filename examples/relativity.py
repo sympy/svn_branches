@@ -8,7 +8,7 @@ sys.path.append("..")
 
 from sympy import exp, Symbol, sin, Rational, Derivative, dsolve
 
-from sympy.core import Basic, Function
+from sympy import Function
 from sympy.modules.matrices import Matrix
 
 def grad(f,X):
