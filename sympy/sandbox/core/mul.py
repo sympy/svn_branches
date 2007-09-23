@@ -1,6 +1,6 @@
 
 from utils import memoizer_immutable_args
-from basic import Basic, MutableCompositeDict
+from basic import Basic, MutableCompositeDict, sympify
 from methods import ArithMeths, ImmutableMeths, RelationalMeths
 
 class MutableMul(ArithMeths, RelationalMeths, MutableCompositeDict):
@@ -12,77 +12,71 @@ class MutableMul(ArithMeths, RelationalMeths, MutableCompositeDict):
     """
 
     # canonize methods
-
+    
     def update(self, a, p=1):
         """
         Mul({}).update(a,p) -> Mul({a:p})
         """
         if a.__class__ is dict:
-            # construct Mul instance from a canonical dictionary
+            # construct Mul instance from a canonical dictionary,
+            # it must contain Basic instances as keys as well as values.
             assert len(self)==0,`len(self)` # make sure no data is overwritten
             assert p is 1,`p`
             super(MutableMul, self).update(a)
             return
         a = Basic.sympify(a)
-        if a.is_Number:
-            if p==1: v = a
-            elif p.is_Integer:
-                v = a ** p
-            else:
-                v = None
-            if v is not None:
-                try:
-                    self[1] *= v
-                except KeyError:
-                    self[1] = v
-                return
-        if a.is_Add and len(a)==1:
-            # Mul({x:3,1:4}).update(Add({x:2})) -> Mul({x:3+1,1:4*2})
+        if a.is_MutableAdd and len(a)==1:
+            # Mul({x:3,4:1}).update(Add({x:2})) -> Mul({x:3+1,4:1,2:1})
             k, v = a.items()[0]
             self.update(k, p)
             self.update(v, p)
-        elif a.is_MutableMul:
+            return
+        if a.is_MutableMul:
             # Mul({x:3}).update(Mul({x:2}), 4) -> Mul({x:3}).update(x,2*4)
             for k,v in a.items():
                 # todo?: make it noncommutative product for (a**2)**(1/2)
                 #        (a**z)**w where z,w are complex numbers
                 self.update(k, v * p)
-        else:
-            try:
-                self[a] += p
-            except KeyError:
-                self[a] = p
+            return
+        try:
+            self[a] += p
+        except KeyError:
+            self[a] = sympify(p)
 
     def canonical(self):
         # self will be modified in-place,
         # always return an immutable object
-        obj = self
-        c = obj.pop(1, Basic.Integer(1))
-        for k,v in obj.items():
+        n = Basic.one
+        for k,v in self.items():
             if v==0:
                 # Mul({a:0}) -> 1
-                del obj[k]
-        if c==0:
-            # todo: handle 0*oo->nan, either here or in Number
-            return c
-        if len(obj)==0:
-            return c
-        if len(obj)==1:
+                del self[k]
+                continue
+            a = k.try_power(v)
+            if a is None: continue
+            del self[k]
+            if a.is_Number:
+                n *= a
+            else:
+                self.update(a)
+                return self.canonical()
+        if self.has_key(n):
+            self.update(n)
+            return self.canonical()
+        self.__class__ = Mul
+        if len(self)==0:
+            return n
+        obj = self
+        if len(self)==1:
             # Mul({a:1}) -> a
-            k,v = obj.items()[0]
-            if v==1:
+            k,v = self.items()[0]
+            if v.is_one:
                 obj = k
-            elif k.is_Mul:
-                del obj[k]
-                for k1,v1 in k.items():
-                    obj[k1] = v1 * v
-        if obj.is_MutableMul:
-            # turn obj into an immutable instance:
-            obj.__class__ = Mul
-        if c!=1:
-            # Mul({1:c,rest:power}) -> Add({Mul({rest:power}):c})
-            obj = Basic.Add({obj:c})
-        return obj
+        if n.is_one:
+            return obj
+        s = Basic.MutableAdd()
+        s.update(obj, n)
+        return s.canonical()
 
     # arithmetics methods
     def __imul__(self, other):
@@ -131,10 +125,6 @@ class Mul(ImmutableMeths, MutableMul):
         seq = []
         items = sorted(self.items())
         for base, exp in items:
-            # XXX: needed because ints are present in Mul
-            base = Basic.sympify(base)
-            exp = Basic.sympify(exp)
-
             basestr = base.tostr()
             if not (base.is_Symbol or (base.is_Integer and base > 0)):
                 basestr = "(" + basestr + ")"
@@ -153,17 +143,12 @@ class Pow(Basic):
     def __new__(cls, a, b):
         a = Basic.sympify(a)
         b = Basic.sympify(b)
-        if b==0: return Basic.Integer(1)
-        if b==1: return a
-        if a==1: return a
-        #p = a._eval_power(b)
-        #if p is not None: return p
+        if b.is_zero: return Basic.one
+        if b.is_one: return a
+        if a.is_one: return a
         m = MutableMul()
         m.update(a,b)
         return m.canonical()
-        return Mul({a:b})
-
 
 def sqrt(x):
     return Pow(x, Basic.Rational(1,2))
-

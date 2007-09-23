@@ -74,6 +74,17 @@ class Number(NumberMeths, Atom):
         if c: return c
         return cmp(self.as_native(), other.as_native())
 
+    def try_power(self, other):
+        r = self.__pow__(other)
+        if r is not NotImplemented:
+            return r
+        if other.is_Number:
+            s = eval('self.as_%s' % (other.__class__.__name__))
+            r = s.__pow__(other)
+            if r is not NotImplemented:
+                return r
+        return
+
 class Real(Number):
 
     """
@@ -196,3 +207,6 @@ from py_fraction import Fraction
 from numerics_float import Float
 #from decimal_float import Float
 from interval import Interval
+
+Basic.one = Integer(1)
+Basic.zero = Integer(0)

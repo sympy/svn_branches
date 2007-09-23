@@ -47,9 +47,6 @@ class ArithMeths:
     def __pow__(self, other):
         return Basic.Pow(self, other)
 
-    def _eval_power(self, exponent):
-        return
-
     def __radd__(self, other):
         if isinstance(other, Basic):
             return Basic.Add(other, self)
@@ -74,6 +71,12 @@ class ArithMeths:
         if isinstance(other, Basic):
             return Basic.Pow(other, self)            
         return sympify(other) ** self
+
+    def try_power(self, exponent):
+        """ Try evaluating power self ** exponent.
+        Return None if no evaluation is carried out.
+        """
+        return
 
     def expand(self, *args, **kwargs):
         return self

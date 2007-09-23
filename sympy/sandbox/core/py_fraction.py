@@ -97,8 +97,6 @@ class Fraction(Rational, tuple):
                 return Fraction.make(self.q ** p, self.p ** p)
             p = other.p
             return Fraction.make(self.p ** p, self.q ** p)
-        if other.is_Fraction:
-            return Basic.Pow(self, other)
         return NotImplemented
 
     def __radd__(self, other):
