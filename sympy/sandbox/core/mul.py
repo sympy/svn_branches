@@ -139,7 +139,11 @@ class Mul(ImmutableMeths, MutableMul):
 
 
 class Pow(Basic):
+    """
+    For backward compatibility.
 
+    Pow instances will be never created.
+    """
     def __new__(cls, a, b):
         a = Basic.sympify(a)
         b = Basic.sympify(b)

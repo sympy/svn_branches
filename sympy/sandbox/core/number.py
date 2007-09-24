@@ -172,11 +172,9 @@ class Rational(Real):
     def __float__(self):
         return float(self.evalf())
 
-from py_integer import Integer
-from py_fraction import Fraction
-#from py_float import Float
+from integer import Integer
+from fraction import Fraction
 from numerics_float import Float
-#from decimal_float import Float
 from interval import Interval
 
 Basic.one = Integer(1)

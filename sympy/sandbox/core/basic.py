@@ -1,11 +1,11 @@
 
 ordering_of_classes = [
-    'Integer','Fraction','Real',
+    'Integer','Fraction','Real','Interval',
     'Symbol',
-    'Mul','Add',
+    'MutableMul', 'Mul', 'MutableAdd', 'Add',
     'Function',
     'sin','cos',
-    'Equality','StrictInequality','Inequality',
+    'Equality','Unequality','StrictInequality','Inequality',
     ]
 
 class BasicType(type):

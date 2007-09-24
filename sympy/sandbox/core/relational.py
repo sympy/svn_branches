@@ -8,8 +8,6 @@ Defines relational classes.
 from utils import memoizer_immutable_args
 from basic import Composite, sympify
 
-
-
 class Relational(Composite, tuple):
 
     def __new__(cls, lhs, rhs):
@@ -60,6 +58,7 @@ class Equality(Relational):
     def __nonzero__(self):
         return self.lhs.compare(self.rhs)==0
 
+
 class Unequality(Relational):
 
     rel_op = '!='
@@ -75,6 +74,7 @@ class Unequality(Relational):
     def __nonzero__(self):
         return self.lhs.compare(self.rhs)!=0
 
+
 class StrictInequality(Relational):
 
     rel_op = '<'
@@ -82,6 +82,7 @@ class StrictInequality(Relational):
     @memoizer_immutable_args('StrictInequality.__nonzero__')
     def __nonzero__(self):
         return self.lhs.compare(self.rhs)==-1
+
 
 class Inequality(Relational):
 
