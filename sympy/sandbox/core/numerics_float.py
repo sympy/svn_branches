@@ -239,10 +239,7 @@ class Float(Real, tuple):
         if isinstance(x, (int, long)):
             return tuple.__new__(cls, normalize(x, 0, prec, mode))
         if isinstance(x, float):
-            # We assume that a float mantissa has 53 bits
-            m, e = math.frexp(x)
-            return tuple.__new__(cls, normalize(int(m*(1<<53)), e-53, prec, mode))
-
+            return cls(float_from_pyfloat(x, prec, mode))
         if isinstance(x, (str, Basic.Rational)):
             # Basic.Rational should support parsing
             if isinstance(x, str):
@@ -250,10 +247,7 @@ class Float(Real, tuple):
                 import sympy
                 x = sympy.Rational(x)
                 x = Basic.Rational(x.p, x.q)
-
-            n = prec + bitcount(x.q) + 2
-            return tuple.__new__(cls, normalize((x.p<<n)//x.q, -n, prec, mode))
-
+            return cls(float_from_rational(x.p, x.q, prec, mode))
         if isinstance(x, Basic):
             return x.evalf()
         raise TypeError(`x`)
@@ -275,24 +269,15 @@ class Float(Real, tuple):
 
     def __float__(s):
         """Convert to a Python float. May raise OverflowError."""
-        try:
-            return math.ldexp(s.man, s.exp)
-        except OverflowError:
-            # Try resizing the mantissa. Overflow may still happen here.
-            n = s.bc - 53
-            m = s.man >> n
-            return math.ldexp(m, s.exp + n)
+        return float_to_pyfloat(s)
 
     def __int__(s):
         """Convert to a Python int, using floor rounding"""
-        return rshift(s.man, -s.exp, 0)
+        return float_to_int(s)
 
     def rational(s): # XXX: use s.as_Fraction instead
         """Convert to a SymPy Rational"""
-        if s.exp > 0:
-            return Basic.Rational(s.man * 2**s.exp, 1)
-        else:
-            return Basic.Rational(s.man, 2**(-s.exp))
+        return Basic.Rational(*float_to_rational(s))
 
     def __repr__(s):
         """Represent s as a decimal string, with sufficiently many

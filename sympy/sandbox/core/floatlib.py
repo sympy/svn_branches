@@ -208,7 +208,54 @@ def normalize(man, exp, prec=STANDARD_PREC, rounding=ROUND_HALF_EVEN):
         return 0, 0, 0
     return man, exp, bc
 
-one = normalize(1, 0)
+#----------------------------------------------------------------------------#
+#                                                                            #
+#                            Type conversion                                 #
+#                                                                            #
+#----------------------------------------------------------------------------#
+
+def float_from_int(n, prec=STANDARD_PREC, rounding=ROUND_HALF_EVEN):
+    return normalize(n, 0, prec, rounding)
+
+def float_from_rational(p, q, prec=STANDARD_PREC, rounding=ROUND_HALF_EVEN):
+    """Create floating-point number from a rational number p/q"""
+    n = prec + bitcount(q) + 2
+    return normalize((p<<n)//q, -n, prec, rounding)
+
+def float_from_pyfloat(x, prec=STANDARD_PREC, rounding=ROUND_HALF_EVEN):
+    # We assume that a float mantissa has 53 bits
+    m, e = math.frexp(x)
+    return normalize(int(m*(1<<53)), e-53, prec, rounding)
+
+def float_to_int(s):
+    man, exp, bc = s
+    return rshift(man, -exp, ROUND_DOWN)
+
+def float_to_pyfloat(s):
+    """Convert to a Python float. May raise OverflowError."""
+    man, exp, bc = s
+    try:
+        return math.ldexp(man, exp)
+    except OverflowError:
+        # Try resizing the mantissa. Overflow may still happen here.
+        n = bc - 53
+        m = man >> n
+        return math.ldexp(m, exp + n)
+
+def float_to_rational(s):
+    """Return p/q such that s = p/q exactly. p and q are not reduced
+    to lowest terms."""
+    man, exp, bc = s
+    if exp > 0:
+        return man * 2**exp, 1
+    else:
+        return man, 2**-exp
+
+
+fone = float_from_int(1)
+ftwo = float_from_int(2)
+fhalf = float_from_rational(1, 2)
+assert fhalf == float_from_pyfloat(0.5)
 
 
 #----------------------------------------------------------------------------#
@@ -310,18 +357,18 @@ def fdiv(s, t, prec=STANDARD_PREC, rounding=ROUND_HALF_EVEN):
 def fpow(s, n, prec=STANDARD_PREC, rounding=ROUND_HALF_EVEN):
     """Compute s**n, where n is an integer"""
     n = int(n)
-    if n == 0: return one
+    if n == 0: return fone
     if n == 1: return normalize(s[0], s[1], prec, rounding)
     if n == 2: return fmul(s, s, prec, rounding)
-    if n == -1: return fdiv(one, s, prec, rounding)
+    if n == -1: return fdiv(fone, s, prec, rounding)
     if n < 0:
-        return fdiv(one, fpow(s, -n, prec+3, ROUND_FLOOR), prec, rounding)
+        return fdiv(fone, fpow(s, -n, prec+3, ROUND_FLOOR), prec, rounding)
     # Now we perform binary exponentiation. Need to estimate precision
     # to avoid rounding from temporary operations. Roughly log_2(n)
     # operations are performed.
     prec2 = prec + int(4*math.log(n, 2) + 4)
     man, exp, bc = normalize(s[0], s[1], prec2, ROUND_FLOOR)
-    pm, pe, pbc = one
+    pm, pe, pbc = fone
     while n:
         if n & 1:
             pm, pe, pbc = normalize(pm*man, pe+exp, prec2, ROUND_FLOOR)
