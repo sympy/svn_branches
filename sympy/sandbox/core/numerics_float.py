@@ -9,9 +9,7 @@ from utils import memoizer_immutable_args, memoizer_Float_new
 from basic import Basic, sympify
 from number import Real
 
-#----------------------------------------------------------------------
-# Helper functions for bit manipulation and rounding
-#
+
 
 import math
 import decimal
@@ -29,33 +27,15 @@ def binary_to_decimal(man, exp, n):
     decimal.getcontext().prec = prec_
     return a
 
-def bitcount(n, log=math.log, table=(0,1,2,2,3,3,3,3,4,4,4,4,4,4,4,4)):
-    """Give position of the highest set bit in an integer"""
-    if not n: return 0
-    if n < 0: n = -n
-    # math.log gives a good estimate, and never overflows, but
-    # is not always exact. Subtract 2 to underestimate, then
-    # count remaining bits by table lookup
-    bc = int(log(n, 2)) - 2
-    if bc < 0:
-        bc = 0
-    return bc + table[n >> bc]
 
-def trailing_zeros(n):
-    """Count trailing zero bits in an integer."""
-    if n & 1: return 0
-    if not n: return 0
-    if n < 0: n = -n
-    t = 0
-    while not n & 0xffffffffffffffff: n >>= 64; t += 64
-    while not n & 0xff: n >>= 8; t += 8
-    while not n & 1: n >>= 1; t += 1
-    return t
-
-# All supported rounding modes
+# All supported rounding modes. We define them as integer constants for easy
+# management, but change __repr__ to 
 
 class _RoundingMode(int):
-    def __new__(cls, level, name): a=int.__new__(cls, level); a.name=name; return a
+    def __new__(cls, level, name):
+        a = int.__new__(cls, level)
+        a.name = name
+        return a
     def __repr__(self): return self.name
 
 ROUND_DOWN    = _RoundingMode(1, 'ROUND_DOWN')
@@ -67,19 +47,59 @@ ROUND_HALF_DOWN = _RoundingMode(6, 'ROUND_HALF_DOWN')
 ROUND_HALF_EVEN = _RoundingMode(7, 'ROUND_HALF_EVEN')
 
 
+
+#----------------------------------------------------------------------------#
+#                                                                            #
+#                     Low-level arithmetic functions                         #
+#                                                                            #
+#                          Bit manipulation, etc                             #
+#                                                                            #
+#----------------------------------------------------------------------------#
+
+def bitcount(n, log=math.log, table=(0,1,2,2,3,3,3,3,4,4,4,4,4,4,4,4)):
+    """Give size of n in bits; i.e. the position of the highest set bit
+    in n. If n is negative, the absolute value is used. The bitcount of
+    zero is taken to be 0."""
+
+    if not n: return 0
+    if n < 0: n = -n
+
+    # math.log gives a good estimate, and never overflows, but
+    # is not always exact. Subtract 2 to underestimate, then
+    # count remaining bits by table lookup
+    bc = int(log(n, 2)) - 2
+    if bc < 0:
+        bc = 0
+    return bc + table[n >> bc]
+
+def trailing_zeros(n):
+    """Count trailing zero bits in an integer. If n is negative, it is
+    replaced by its absolute value."""
+    if n & 1: return 0
+    if not n: return 0
+    if n < 0: n = -n
+    t = 0
+    while not n & 0xffffffffffffffff: n >>= 64; t += 64
+    while not n & 0xff: n >>= 8; t += 8
+    while not n & 1: n >>= 1; t += 1
+    return t
+
 def rshift(x, n, mode):
     """Shift x n bits to the right (i.e., calculate x/(2**n)), and
     round to the nearest integer in accordance with the specified
     rounding mode. The exponent n may be negative, in which case x is
     shifted to the left (and no rounding is necessary)."""
+
     if not n or not x:
         return x
+    # Support left-shifting (no rounding needed)
     if n < 0:
         return x << -n
-    # Bit-fiddling is relatively expensive in Python. To get away easily, we
-    # can exploit the fact that Python rounds positive integers toward
-    # zero and negative integers away from zero when dividing/shifting.
-    # The first few cases can be handled through simple shifting.
+
+    # To get away easily, we exploit the fact that Python rounds positive
+    # integers toward zero and negative integers away from zero when dividing
+    # or shifting. The simplest rounding modes can be handled entirely through
+    # shifts:
     if mode < ROUND_HALF_UP:
         if mode == ROUND_DOWN:
             if x > 0: return x >> n
@@ -91,6 +111,7 @@ def rshift(x, n, mode):
             return x >> n
         if mode == ROUND_CEILING:
             return -((-x) >> n)
+
     # Here we need to inspect the bits around the cutoff point
     if x > 0: t = x >> (n-1)
     else:     t = (-x) >> (n-1)
@@ -108,8 +129,8 @@ def normalize(man, exp, prec, mode):
     man * 2**exp to the specified precision level, rounding according
     to the specified rounding mode if necessary. The mantissa is also
     stripped of trailing zero bits, and its bits are counted. The
-    returned value is a tuple (man, exp, bc).
-    """
+    returned value is a tuple (man, exp, bc)."""
+
     if not man:
         return 0, 0, 0
     bc = bitcount(man)
@@ -117,6 +138,7 @@ def normalize(man, exp, prec, mode):
         man = rshift(man, bc-prec, mode)
         exp += (bc - prec)
         bc = prec
+
     # Strip trailing zeros
     if not man & 1:
         tr = trailing_zeros(man)
@@ -124,9 +146,66 @@ def normalize(man, exp, prec, mode):
             man >>= tr
             exp += tr
             bc -= tr
+
     if not man:
-        return 0, 0, 0
+        return (0, 0, 0)
     return man, exp, bc
+
+
+def fadd(s, t, prec=53, rounding=ROUND_HALF_EVEN):
+    """Floating-point addition. Given two tuples s and t containing the
+    components of floating-point numbers, return their sum rounded to 'prec'
+    bits using the 'rounding' mode, represented as a tuple of components."""
+
+    #  General algorithm: we set min(s.exp, t.exp) = 0, perform exact integer
+    #  addition, and then round the result.
+    #                   exp = 0
+    #                       |
+    #                       v
+    #          11111111100000   <-- s.man (padded with zeros from shifting)
+    #      +        222222222   <-- t.man (no shifting necessary)
+    #          --------------
+    #      =   11111333333333
+
+    # We assume that s has the higher exponent. If not, just switch them:
+    if t[1] > s[1]:
+        s, t = t, s
+
+    sman, sexp, sbc = s
+    tman, texp, tbc = t
+
+    # Check if one operand is zero. Float(0) always has exp = 0; if the
+    # other operand has a large exponent, its mantissa will unnecessarily
+    # be shifted a huge number of bits if we don't check for this case.
+    if not tman:
+        return normalize(sman, sexp, prec, rounding)
+    if not sman:
+        return normalize(tman, texp, prec, rounding)
+
+    # More generally, if one number is huge and the other is small,
+    # and in particular, if their mantissas don't overlap at all at
+    # the current precision level, we can avoid work.
+
+    #       precision
+    #    |            |
+    #     111111111
+    #  +                 222222222
+    #     ------------------------
+    #  #  1111111110000...
+
+    # However, if the rounding isn't to nearest, correct rounding mandates
+    # the result should be adjusted up or down. This is not yet implemented.
+
+    if sexp - texp > 100:
+        bitdelta = (sbc+sexp)-(tbc+texp)
+        if bitdelta > prec + 5:
+            # TODO: handle rounding here
+            return normalize(sman, sexp, prec, rounding)
+
+    # General case
+    return normalize(tman+(sman<<(sexp-texp)), texp, prec, rounding)
+
+
 
 
 # Construct Float from raw man and exp
@@ -138,6 +217,7 @@ def makefloat_from_fraction(p, q):
     mode = Float._mode
     n = prec + bitcount(q) + 2
     return tuple.__new__(Float, normalize((p<<n)//q, -n, prec, mode))
+
 
 
 #----------------------------------------------------------------------
@@ -586,18 +666,7 @@ class Float(Real, tuple):
         if t.is_Rational:
             t = t.as_Float
         if t.is_Float:
-            if t[1] > s[1]:
-                s, t = t, s
-            sman, sexp, sbc = s
-            tman, texp, tbc = t
-            if not tman: return +s
-            if not sman: return +t
-            if sexp - texp > 100:
-                bitdelta = (sbc+sexp)-(tbc+texp)
-                if bitdelta > s._prec+5:
-                    # TODO: handle rounding
-                    return +s
-            return makefloat(tman+(sman<<(sexp-texp)), texp)
+            return Float(fadd(s, t, Float._prec, Float._mode))
         return NotImplemented
 
     def __radd__(self, other):
