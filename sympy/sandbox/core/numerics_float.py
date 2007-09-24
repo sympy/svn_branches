@@ -306,37 +306,9 @@ class Float(Real, tuple):
         """
         if self is other: return 0
         c = cmp(self.__class__, other.__class__)
-        if c: return c        
-        # An inequality between two numbers s and t is determined by looking
-        # at the value of s-t. A full floating-point subtraction is relatively
-        # slow, so we first try to look at the exponents and signs of s and t.
-        sm, se, sbc = self # = s
-        tm, te, tbc = other # = t
-
-        # Very easy cases: check for 0's and opposite signs
-        if not tm: return cmp(sm, 0)
-        if not sm: return cmp(0, tm)
-        if sm > 0 and tm < 0: return 1
-        if sm < 0 and tm > 0: return -1
-
-        # In this case, the numbers likely have the same magnitude
-        if se == te: return cmp(sm, tm)
-
-        # The numbers have the same sign but different exponents. In this
-        # case we try to determine if they are of different magnitude by
-        # checking the position of the highest set bit in each number.
-        a = sbc + se
-        b = tbc + te
-        if sm > 0:
-            if a < b: return -1
-            if a > b: return 1
-        else:
-            if a < b: return 1
-            if a < b: return -1
-
-        # The numbers have similar magnitude but different exponents.
-        # So we subtract and check the sign of resulting mantissa.
-        return cmp((self-other)[0], 0)
+        if c:
+            return c
+        return fcmp(self, other)
 
     def __eq__(self, other):
         """s.__eq__(t) <==> s == Float(t)
@@ -533,8 +505,7 @@ class Float(Real, tuple):
             n = n.as_Float
         if n.is_Float:
             if n == 0.5:
-                from numerics.functions import sqrt
-                return sqrt(s)
+                return Float(fsqrt(s, Float._prec, Float._mode))
             from numerics.functions import exp, log
             return exp(n * log(s))
         return NotImplemented

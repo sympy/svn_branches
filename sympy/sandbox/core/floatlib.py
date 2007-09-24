@@ -48,6 +48,14 @@ ROUND_HALF_DOWN = RoundingMode(6, 'ROUND_HALF_DOWN')
 ROUND_HALF_EVEN = RoundingMode(7, 'ROUND_HALF_EVEN')
 
 
+def _quadratic_steps(start, target):
+    # generate list of precision steps for quadratically convergent algorithms
+    L = [target]
+    while L[-1] > start*2:
+        L = L + [L[-1]//2 + 1]
+    return L[::-1]
+
+
 #----------------------------------------------------------------------------#
 #                                                                            #
 #                             Radix conversion                               #
@@ -143,6 +151,16 @@ def trailing_zeros(n):
     while not n & 0xff: n >>= 8; t += 8
     while not n & 1: n >>= 1; t += 1
     return t
+
+def _rshift(x, n):
+    # quick right shift with default rounding
+    if n >= 0: return x >> n
+    else:      return x << (-n)
+
+def _lshift(x, n):
+    # quick left shift with default rounding
+    if n >= 0: return x << n
+    else:      return x >> (-n)
 
 def rshift(x, n, mode):
     """Shift x n bits to the right (i.e., calculate x/(2**n)), and
@@ -252,6 +270,7 @@ def float_to_rational(s):
         return man, 2**-exp
 
 
+fzero = float_from_int(0)
 fone = float_from_int(1)
 ftwo = float_from_int(2)
 fhalf = float_from_rational(1, 2)
@@ -260,7 +279,54 @@ assert fhalf == float_from_pyfloat(0.5)
 
 #----------------------------------------------------------------------------#
 #                                                                            #
-#                             Base arithmetic                                #
+#                                Comparison                                  #
+#                                                                            #
+#----------------------------------------------------------------------------#
+
+def feq(s, t):
+    """Floating-point equality testing. The numbers are assumed to
+    be normalized, meaning that this simply performs tuple comparison."""
+    return s == t
+
+def fcmp(s, t):
+    """Floating-point comparison. Return -1 if s < t, 0 if s == t,
+    and 1 if s > t."""
+
+    # An inequality between two numbers s and t is determined by looking
+    # at the value of s-t. A full floating-point subtraction is relatively
+    # slow, so we first try to look at the exponents and signs of s and t.
+    sman, sexp, sbc = s
+    tman, texp, tbc = t
+
+    # Very easy cases: check for 0's and opposite signs
+    if not tman: return cmp(sman, 0)
+    if not sman: return cmp(0, tman)
+    if sman > 0 and tman < 0: return 1
+    if sman < 0 and tman > 0: return -1
+
+    # In this case, the numbers likely have the same magnitude
+    if sexp == texp: return cmp(sman, tman)
+
+    # The numbers have the same sign but different exponents. In this
+    # case we try to determine if they are of different magnitude by
+    # checking the position of the highest set bit in each number.
+    a = sbc + sexp
+    b = tbc + texp
+    if sman > 0:
+        if a < b: return -1
+        if a > b: return 1
+    else:
+        if a < b: return 1
+        if a < b: return -1
+
+    # The numbers have similar magnitude but different exponents.
+    # So we subtract and check the sign of resulting mantissa.
+    return cmp(fsub(s, t, prec=5)[0], 0)
+
+
+#----------------------------------------------------------------------------#
+#                                                                            #
+#                            Basic arithmetic                                #
 #                                                                            #
 #----------------------------------------------------------------------------#
 
@@ -376,3 +442,187 @@ def fpow(s, n, prec=STANDARD_PREC, rounding=ROUND_HALF_EVEN):
         man, exp, bc = normalize(man*man, exp+exp, prec2, ROUND_FLOOR)
         n = n // 2
     return normalize(pm, pe, prec, rounding)
+
+
+"""
+Square roots are most efficiently computed with Newton's method.
+Two functions are implemented: _sqrt_fixed and _sqrt_fixed2.
+
+  _sqrt_fixed uses the iteration r_{n+1} = (r_n + y/r_n)/2,
+  which is just Newton's method applied to the equation r**2 = y.
+
+  _sqrt_fixed2 uses the iteration r_{n+1} = r_n*(3 - y*r_n**2)
+  to calculate 1/sqrt(y), and then multiplies by y to obtain
+  sqrt(y).
+
+The first iteration is slightly faster at low precision levels, since
+it essentially just requires one division at each step, compared to
+the three multiplications in the second formula. However, the second
+iteration is much better at extremely high precision levels. This is
+due to the fact that Python uses the Karatsuba algorithm for integer
+multiplication, which is asymptotically faster than its division
+algorithm.
+
+For optimal speed, we exploit the "self-correcting" nature of
+Newton's method to perform subcomputations at as low a precision level
+as possible. Starting from a 50-bit floating-point estimate, the
+first step can be computed using 100-bit precision, the second
+at 200-bit precision, and so on; full precision is only needed for
+the final step.
+
+Both functions use fixed-point arithmetic and assume that the input y
+is a big integer, i.e. given the integer y and precision prec,
+they return floor(sqrt(x) * 2**prec) where y = floor(x * 2**prec).
+
+The functions currently assume that x ~= 1. (TODO: make the code
+work for x of arbitrary magnitude.) The main fsqrt() function
+fiddles with the exponent of the input to reduce it to unit
+magnitude before passing it to _sqrt_fixed or _sqrt_fixed2.
+
+"""
+
+def _sqrt_fixed(y, prec):
+    # get 50-bit initial guess from regular float math
+    if prec < 200:
+        r = int(y**0.5 * 2.0**(50-prec*0.5))
+    else:
+        r = int((y >> (prec-100))**0.5)
+    prevp = 50
+    for p in _quadratic_steps(50, prec+8):
+        # Newton iteration: r_{n+1} = (r_{n} + y/r_{n})/2
+        # print "sqrt", p
+        r = _lshift(r, p-prevp-1) + (_rshift(y, prec-p-prevp+1)//r)
+        prevp = p
+    return r >> 8
+
+def _sqrt_fixed2(y, prec):
+    r = float_to_pyfloat(normalize(y, -prec, 64, ROUND_FLOOR)) ** -0.5
+    r = int(r * 2**50)
+    prevp = 50
+    for p in _quadratic_steps(50, prec+8):
+        # print "sqrt", p
+        r2 = _rshift(r*r, 2*prevp - p)
+        A = _lshift(r, p-prevp)
+        T = _rshift(y, prec-p)
+        S = (T*r2) >> p
+        B = (3 << p) - S
+        r = (A*B)>>(p+1)
+        prevp = p
+    r = (r * y) >> prec
+    return r >> 8
+
+def fsqrt(s, prec=STANDARD_PREC, rounding=ROUND_HALF_EVEN):
+    """
+    If x is a positive Float, sqrt(x) returns the square root of x as a
+    Float, rounded to the current working precision.
+    """
+    man, exp, bc = s
+    if not man: return fzero
+    if (man, exp) == (1, 0): return fone
+
+    prec2 = prec + 4
+
+    # Convert to a fixed-point number with prec bits. Adjust
+    # exponents to be even so that they can be divided in half
+    if prec2 & 1:
+        prec2 += 1
+    if exp & 1:
+        exp -= 1
+        man <<= 1
+    shift = bitcount(man) - prec2
+    shift -= shift & 1
+    man = _rshift(man, shift)
+
+    if prec < 65000:
+        man = _sqrt_fixed(man, prec2)
+    else:
+        man = _sqrt_fixed2(man, prec2)
+
+    return normalize(man, (exp+shift-prec2)//2, prec, ROUND_HALF_EVEN)
+
+
+#----------------------------------------------------------------------------#
+#                                                                            #
+#                         Mathematical constants                             #
+#                                                                            #
+#----------------------------------------------------------------------------#
+
+# Evaluate a Machin-like formula, i.e., a rational combination of
+# of acot(n) or acoth(n) for specific integer values of n
+def _machin(coefs, prec, hyperbolic=False):
+    def acot(x):
+        # Series expansion for atan/acot, optimized for integer arguments
+        s = w = (1<<prec)//x; x2 = x*x; n = 3
+        while 1:
+            w //= x2
+            term = w // n
+            if not term: break
+            if hyperbolic or n & 2 == 0: s += term
+            else: s -= term
+            n += 2
+        return s
+    s = 0
+    for a, b in coefs:
+        s += a * acot(b)
+    return s
+
+"""
+At low precision, pi can be calculated easily using Machin's formula
+pi = 16*acot(5)-4*acot(239). For high precision, we use the Brent-Salamin
+algorithm based on the arithmetic-geometric mean. See for example Wikipedia
+(http://en.wikipedia.org/wiki/Brent-Salamin_algorithm) or "Pi and the AGM" by
+Jonathan and Peter Borwein (Wiley, 1987). The algorithm (as stated in the
+Wikipedia article) consists of setting
+
+  a_0 = 1;  b_0 = 1/sqrt(2);  t_0 = 1/4;  p_0 = 1
+
+and computing
+
+  a_{n+1} = (a_n + b_n)/2
+  b_{n+1} = sqrt(a_n * b_n)
+  t_{n+1} = t_n - p_n*(a_n - a_{n+1})**2
+  p_{n+1} = 2*p_n
+
+for n = 0, 1, 2, 3, ..., after which the approximation is given by
+pi ~= (a_n + b_n)**2 / (4*t_n). Each step roughly doubles the number of
+correct digits.
+"""
+
+def _pi_agm(prec, verbose=False, verbose_base=10):
+    prec += 50
+    a = 1 << prec
+    if verbose: print "  computing initial square root..."
+    b = _sqrt_fixed2(a>>1, prec)
+    t = a >> 2
+    p = 1
+    step = 1
+    while 1:
+        an = (a+b)>>1
+        adiff = a - an
+        if verbose:
+            try:
+                logdiff = math.log(adiff, verbose_base)
+            except ValueError:
+                logdiff = 0
+            digits = int(prec/math.log(verbose_base,2) - logdiff)
+            print "  iteration", step, ("(accuracy ~= %i base-%i digits)" % \
+                (digits, verbose_base))
+        if p > 16 and abs(adiff) < 1000:
+            break
+        prod = (a*b)>>prec
+        b = _sqrt_fixed2(prod, prec)
+        t = t - p*((adiff**2) >> prec)
+        p = 2*p
+        a = an
+        step += 1
+    if verbose: print "  final division"
+    return ((((a+b)**2) >> 2) // t) >> 50
+
+def fpi(prec=STANDARD_PREC, rounding=ROUND_HALF_EVEN):
+    """Compute a floating-point approximation of pi"""
+    if prec < 10000:
+        pi_man = _machin([(16, 5), (-4, 239)], prec+10)
+    else:
+        pi_man = _pi_agm(prec+10)
+    return normalize(pi_man, -prec-10, prec, rounding)
+
