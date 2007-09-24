@@ -72,12 +72,24 @@ class Interval(Number, tuple):
     def __eq__(self, other):
         """Two intervals are considered equal if all endpoints are equal"""
         other = sympify(other)
-        if other.is_Real:
-            other = Interval(other)
         if self is other: return True
+        if other.is_Real:
+            other = other.as_Interval
         if other.is_Interval:
             return tuple.__eq__(self, other)
-        return super(Number, self).__eq__(other)
+        return NotImplemented
+
+    def __ne__(self, other):
+        """Two intervals are considered equal if all endpoints are equal"""
+        other = sympify(other)
+        if self is other: return False
+        if other.is_Real:
+            other = other.as_Interval
+        if other.is_Interval:
+            return tuple.__ne__(self, other)
+        return NotImplemented
+
+    #TODO: impl __lt__, __gt__, __le__, __ge__ methods
 
     def __contains__(self, x):
         """Return True if x is contained in the interval, otherwise False."""

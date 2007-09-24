@@ -362,6 +362,7 @@ class Float(Real, tuple):
         if isinstance(x, (str, Basic.Rational)):
             # Basic.Rational should support parsing
             if isinstance(x, str):
+                # XXX: fix this code
                 import sympy
                 x = sympy.Rational(x)
                 x = Basic.Rational(x.p, x.q)
@@ -402,7 +403,7 @@ class Float(Real, tuple):
         """Convert to a Python int, using floor rounding"""
         return rshift(s.man, -s.exp, 0)
 
-    def rational(s):
+    def rational(s): # XXX: use s.as_Fraction instead
         """Convert to a SymPy Rational"""
         if s.exp > 0:
             return Basic.Rational(s.man * 2**s.exp, 1)
@@ -425,15 +426,8 @@ class Float(Real, tuple):
     # Comparisons
     #
 
-    def __cmp__(s, t):
-        """s.__cmp__(t) <==> cmp(s, t)
-
-        If t is a Float, int or float, this returns -1 if s < t, 0 if
-        s == t, and 1 if s > t. The comparison operators >, >=, <, <=
-        are defined in terms of this function. If t is a SymPy Basic
-        instance, s is converted into a Rational and Rational.__cmp__
-        is called.
-
+    def compare(self, other):
+        """
         Warning: in extreme cases, the truncation error resulting from
         calling Float(t) will result in an erroneous comparison: for
         example, Float(2**80) will compare as equal to 2**80+1. This
@@ -441,21 +435,14 @@ class Float(Real, tuple):
         precision or by converting numbers into Rationals for
         comparisons.
         """
-
-        if not isinstance(t, Float):
-            #if isinstance(t, Basic):
-            #    return s.rational().__cmp__(t)
-            t = Float(t)
-
-        # Note: the reason we call cmp(x,y) below instead of directly forming
-        # the integer x-y is that the output from __cmp__ must be a machine
-        # size integer in Python.
-
+        if self is other: return 0
+        c = cmp(self.__class__, other.__class__)
+        if c: return c        
         # An inequality between two numbers s and t is determined by looking
         # at the value of s-t. A full floating-point subtraction is relatively
         # slow, so we first try to look at the exponents and signs of s and t.
-        sm, se, sbc = s
-        tm, te, tbc = t
+        sm, se, sbc = self # = s
+        tm, te, tbc = other # = t
 
         # Very easy cases: check for 0's and opposite signs
         if not tm: return cmp(sm, 0)
@@ -480,41 +467,65 @@ class Float(Real, tuple):
 
         # The numbers have similar magnitude but different exponents.
         # So we subtract and check the sign of resulting mantissa.
-        return cmp((s-t)[0], 0)
+        return cmp((self-other)[0], 0)
 
-
-    # Since Float inherits from tuple, these functions must be defined
-    # in addition to __cmp__ to override the tuple methods.
-    __lt__ = lambda s, t: s.__cmp__(t) < 0
-    __gt__ = lambda s, t: s.__cmp__(t) > 0
-    __le__ = lambda s, t: s.__cmp__(t) <= 0
-    __ge__ = lambda s, t: s.__cmp__(t) >= 0
-
-
-    """
-    We implement __eq__ separately from __cmp__. One reason for doing this
-    performance: due to the way Floats are normalized, two Floats are
-    mathematically equal iff all three parts (man, exp, bc) are equal. So we
-    can do a direct tuple comparison and avoid the machinery in __cmp__.
-
-    Another reason is to support == and != between Floats and ComplexFloat.
-    ComplexFloats are not supported by __cmp__, since complex numbers are
-    unordered.
-    """
-    def __eq__(s, t):
+    def __eq__(self, other):
         """s.__eq__(t) <==> s == Float(t)
 
         Determine whether s and Float(t) are equal (see warning for
         __cmp__ about conversion between different types.)"""
-        #if isinstance(t, Basic):
-        #    return s.rational() == t
-        if isinstance(t, Float):
-            return s[:] == t[:]
-        if isinstance(t, (Basic.Real, float, int, long)):
-            return s[:] == Float(t)[:]
-        return Basic.Equality(s, sympify(t))
+        other = Basic.sympify(other)
+        if self is other: return True
+        if other.is_Rational:
+            other = other.as_Float
+        if other.is_Float:
+            return tuple.__eq__(self, other)
+        return NotImplemented
 
-    __ne__ = lambda s, t: not s.__eq__(t)
+    def __ne__(self, other):
+        other = Basic.sympify(other)
+        if self is other: return False
+        if other.is_Rational:
+            other = other.as_Float
+        if other.is_Float:
+            return tuple.__ne__(self, other)
+        return NotImplemented
+
+    def __lt__(self, other):
+        other = Basic.sympify(other)
+        if self is other: return False
+        if other.is_Rational:
+            other = other.as_Float
+        if other.is_Float:
+            return self.compare(other)==-1
+        return NotImplemented
+
+    def __le__(self, other):
+        other = Basic.sympify(other)
+        if self is other: return True
+        if other.is_Rational:
+            other = other.as_Float
+        if other.is_Float:
+            return self.compare(other)<=0
+        return NotImplemented
+
+    def __gt__(self, other):
+        other = Basic.sympify(other)
+        if self is other: return False
+        if other.is_Rational:
+            other = other.as_Float
+        if other.is_Float:
+            return self.compare(other)==1
+        return NotImplemented
+
+    def __ge__(self, other):
+        other = Basic.sympify(other)
+        if self is other: return True
+        if other.is_Rational:
+            other = other.as_Float
+        if other.is_Float:
+            return self.compare(other)>=0
+        return NotImplemented
 
     def ae(s, t, rel_eps=None, abs_eps=None):
         """

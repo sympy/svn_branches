@@ -28,8 +28,3 @@ def test_add_update():
     assert dict(s)=={a:5,b:1,a*b:1,1:6}
     assert dict(s.canonical())=={a:5,b:1,a*b:1,1:6}
     assert s.__class__==Add
-
-    s = MutableAdd()
-    #s.update(2)
-    s.update(3,Rational(1,2))
-    print s

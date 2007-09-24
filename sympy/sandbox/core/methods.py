@@ -1,6 +1,25 @@
 
 from basic import Basic, sympify
 
+"""
+To override Basic relational and arithmetic methods, use the
+following templates:
+
+    def __<mth>__(self, other)
+        other = sympify(other)
+        if other.is_<class convertable to self class>:
+            other = other.as_<self class>
+        if other.is_<same class as self>:
+            ...
+        return NotImplemented
+
+    def __r<mth>__(self, other)
+        if isinstance(other, Basic):
+            return Basic.<mth related class>(other, self)            
+        return sympify(other) <mth op> self 
+
+"""
+
 class RelationalMeths:
 
     def __eq__(self, other):
@@ -101,6 +120,21 @@ class NumberMeths(ArithMeths, RelationalMeths):
 
     def __eq__(self, other):
         raise NotImplementedError('%s must implement __eq__ method' % (self.__class__.__name__))
+
+    def __ne__(self, other):
+        raise NotImplementedError('%s must implement __ne__ method' % (self.__class__.__name__))
+
+    def __lt__(self, other):
+        raise NotImplementedError('%s must implement __lt__ method' % (self.__class__.__name__))
+
+    def __le__(self, other):
+        raise NotImplementedError('%s must implement __le__ method' % (self.__class__.__name__))
+
+    def __gt__(self, other):
+        raise NotImplementedError('%s must implement __gt__ method' % (self.__class__.__name__))
+
+    def __ge__(self, other):
+        raise NotImplementedError('%s must implement __ge__ method' % (self.__class__.__name__))
 
     def __add__(self, other):
         raise NotImplementedError('%s must implement __add__ method' % (self.__class__.__name__))

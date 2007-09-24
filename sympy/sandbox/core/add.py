@@ -66,33 +66,24 @@ class MutableAdd(ArithMeths, RelationalMeths, MutableCompositeDict):
     def canonical(self):
         # self will be modified in-place,
         # always return an immutable object
-        obj = self
-        for k,v in obj.items():
+        for k,v in self.items():
             if v.is_zero:
                 # todo: check that a is not NaN, Infinity
                 # Add({a:0}) -> 0
-                del obj[k]
-        if len(obj)==0:
+                del self[k]
+        # turn self to an immutable instance
+        self.__class__ = Add
+        if len(self)==0:
             return Basic.zero
-        if len(obj)==1:
-            try:
+        if len(self)==1:
+            k,v = self.items()[0]
+            if k.is_one:
                 # Add({1:3}) -> 3
-                return obj[Basic.one]
-            except KeyError:
-                pass
-            # Add({a:1}) -> a
-            k,v = obj.items()[0]
-            if v==1:
-                obj.__class__ = Add
+                return v
+            if v.is_one:
+                # Add({a:1}) -> a
                 return k
-            if k.is_Add:
-                # Add({Add({x:1,1:1}):2}) - > Add({x:2,1:2})            
-                del obj[k]
-                for k1,v1 in k.items():
-                    obj[k1] = v1 * v
-        # turn obj to an immutable instance
-        obj.__class__ = Add
-        return obj
+        return self
 
     # arithmetics methods
     def __iadd__(self, other):

@@ -62,18 +62,6 @@ class Number(NumberMeths, Atom):
         if self.is_Integer: return self
         raise NotImplementedError(`self`)
 
-    def as_native(self):
-        """
-        Return internal representation of number implementation.
-        """
-        raise NotImplementedError(`self`)
-
-    def compare(self, other):
-        if self is other: return 0
-        c = cmp(self.__class__, other.__class__)
-        if c: return c
-        return cmp(self.as_native(), other.as_native())
-
     def try_power(self, other):
         r = self.__pow__(other)
         if r is not NotImplemented:
@@ -127,14 +115,6 @@ class Real(Number):
     @property
     def is_nonnegative(self):
         return self.is_positive or self.is_zero
-
-    def __eq__(self, other):
-        other = sympify(other)
-        if self is other: return True
-        if other.is_Number:
-            return self.compare(other.evalf())==0
-        return super(Number, self).__eq__(other)
-
 
 class Rational(Real):
 
@@ -191,15 +171,6 @@ class Rational(Real):
 
     def __float__(self):
         return float(self.evalf())
-
-    def __eq__(self, other):
-        other = sympify(other)
-        if self is other: return True
-        if other.is_Number:
-            if other.is_Float:
-                return self.evalf()==other
-            return self.compare(other)==0
-        return super(Real, self).__eq__(other)
 
 from py_integer import Integer
 from py_fraction import Fraction

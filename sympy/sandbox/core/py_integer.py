@@ -36,13 +36,47 @@ class Integer(Rational, pyint):
         if c: return c
         return pyint.__cmp__(self, pyint(other))
 
-    # XXX: Integer(3) == Symbol('x') fails without this
     def __eq__(self, other):
         other = Basic.sympify(other)
-        if isinstance(other, Rational):
-            if Rational.__eq__(self, other):
-                return True
-        return Basic.Equality(self, other)
+        if self is other: return True
+        if other.is_Integer:
+            return pyint.__cmp__(self, pyint(other))==0
+        return NotImplemented
+
+    def __ne__(self, other):
+        other = Basic.sympify(other)
+        if self is other: return False
+        if other.is_Integer:
+            return pyint.__cmp__(self, pyint(other))!=0
+        return NotImplemented
+
+    def __lt__(self, other):
+        other = Basic.sympify(other)
+        if self is other: return False
+        if other.is_Integer:
+            return pyint.__cmp__(self, pyint(other))==-1
+        return NotImplemented
+
+    def __le__(self, other):
+        other = Basic.sympify(other)
+        if self is other: return True
+        if other.is_Integer:
+            return pyint.__cmp__(self, pyint(other))<=0
+        return NotImplemented
+
+    def __gt__(self, other):
+        other = Basic.sympify(other)
+        if self is other: return False
+        if other.is_Integer:
+            return pyint.__cmp__(self, pyint(other))==1
+        return NotImplemented
+
+    def __ge__(self, other):
+        other = Basic.sympify(other)
+        if self is other: return True
+        if other.is_Integer:
+            return pyint.__cmp__(self, pyint(other))>=0
+        return NotImplemented
 
     # converter methods
 

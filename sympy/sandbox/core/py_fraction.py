@@ -41,13 +41,59 @@ class Fraction(Rational, tuple):
     @property
     def q(self): return self[1]
 
-    # XXX: Rational(3,2) == Symbol('x') fails without this
     def __eq__(self, other):
         other = Basic.sympify(other)
-        if isinstance(other, Rational):
-            if Rational.__eq__(self, other):
-                return True
-        return Basic.Equality(self, other)
+        if self is other: return True
+        if other.is_Integer:
+            other = other.as_Fraction
+        if other.is_Fraction:
+            return tuple.__eq__(self, other)
+        return NotImplemented
+
+    def __ne__(self, other):
+        other = Basic.sympify(other)
+        if self is other: return False
+        if other.is_Integer:
+            other = other.as_Fraction
+        if other.is_Fraction:
+            return tuple.__ne__(self, other)
+        return NotImplemented
+
+    def __lt__(self, other):
+        other = Basic.sympify(other)
+        if self is other: return False
+        if other.is_Integer:
+            other = other.as_Fraction
+        if other.is_Fraction:
+            return self.p * other.q < self.q * other.p
+        return NotImplemented
+
+    def __le__(self, other):
+        other = Basic.sympify(other)
+        if self is other: return True
+        if other.is_Integer:
+            other = other.as_Fraction
+        if other.is_Fraction:
+            return self.p * other.q <= self.q * other.p
+        return NotImplemented
+
+    def __gt__(self, other):
+        other = Basic.sympify(other)
+        if self is other: return False
+        if other.is_Integer:
+            other = other.as_Fraction
+        if other.is_Fraction:
+            return self.p * other.q > self.q * other.p
+        return NotImplemented
+
+    def __ge__(self, other):
+        other = Basic.sympify(other)
+        if self is other: return True
+        if other.is_Integer:
+            other = other.as_Fraction
+        if other.is_Fraction:
+            return self.p * other.q >= self.q * other.p
+        return NotImplemented
 
     def __pos__(self):
         return self
@@ -141,3 +187,4 @@ class Fraction(Rational, tuple):
         if isinstance(other, Basic):
             return Basic.Pow(other, self)
         return sympify(other) ** self
+
