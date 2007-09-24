@@ -35,6 +35,8 @@ class MutableAdd(ArithMeths, RelationalMeths, MutableCompositeDict):
     instances.
     """
 
+    precedence = Basic.Add_precedence
+
     # canonize methods
 
     def update(self, a, p=1):
@@ -129,9 +131,10 @@ class Add(ImmutableMeths, MutableAdd):
             return [self, Basic.Number(1)]
         return [self]
 
-    def tostr(self):
+    def tostr(self, level=0):
         seq = []
         items = sorted(self.items())
+        p = self.precedence
         for term, coef in items:
             if coef > 0:
                 if seq: seq.append(" + ")
@@ -140,11 +143,14 @@ class Add(ImmutableMeths, MutableAdd):
                 else:   seq.append("-")
                 coef = -coef
             if term == 1:
-                seq.append(coef.tostr())
+                seq.append(coef.tostr(p))
             elif coef.is_Integer and coef == 1:
-                seq.append(term.tostr())
+                seq.append(term.tostr(p))
             elif coef.is_Fraction:
-                seq.append("(" + coef.tostr() + ")" + "*" + term.tostr())
+                seq.append("(" + coef.tostr() + ")" + "*" + term.tostr(p))
             else:
-                seq.append(coef.tostr() + "*" + term.tostr())
-        return "".join(seq)
+                seq.append(coef.tostr(p) + "*" + term.tostr(p))
+        r = "".join(seq)
+        if p<=level:
+            return '(%s)' % r
+        return r

@@ -16,7 +16,7 @@ from relational import Equality, Inequality, Unequality, StrictInequality
 #from function import Lambda, Function, Apply, FApply, Composition, FPow, WildFunction, Derivative, DefinedFunction, diff
 from function import Function
 from interval import Interval
-from singleton import pi, I
+from singleton import pi, I, oo, zoo, E, nan
 
 # set repr output to pretty output:
 #Basic.set_repr_level(1)

@@ -137,13 +137,34 @@ class Fraction(Rational, tuple):
 
     def __pow__(self, other):
         other = sympify(other)
+        r = self.try_power(other)
+        if r is not None:
+            return r
+        return NotImplemented
+
+    def try_power(self, other):
         if other.is_Integer:
             if other.is_negative:
                 p = -other.p
                 return Fraction.make(self.q ** p, self.p ** p)
             p = other.p
             return Fraction.make(self.p ** p, self.q ** p)
-        return NotImplemented
+        if other.is_Fraction:
+            return self.p ** other * self.q ** -other
+        if other.is_Float:
+            return self.as_Float ** other
+        if other.is_Infinity or other.is_ComplexInfinity:
+            if -1 < self < 1:
+                return Basic.zero
+            if self==1:
+                return self
+            if self > 1:
+                return other
+            return Basic.nan
+        if other.is_NaN:
+            if self==0:
+                return self
+            return other
 
     def __radd__(self, other):
         if isinstance(other, Basic):

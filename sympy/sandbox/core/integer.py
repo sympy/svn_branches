@@ -2,6 +2,47 @@ from utils import memoizer_immutable_args
 from basic import Basic, sympify
 from number import Rational
 
+def integer_nthroot(y, n):
+    """
+    Usage
+    =====
+        Return a tuple containing x = floor(y**(1/n))
+        and a boolean indicating whether the result is exact (that is,
+        whether x**n == y).
+
+    Examples
+    ========
+
+        >>> integer_nthroot(16,2)
+        (4, True)
+        >>> integer_nthroot(26,2)
+        (5, False)
+        >>> integer_nthroot(1234567**7, 7)
+        (1234567L, True)
+        >>> integer_nthroot(1234567**7+1, 7)
+        (1234567L, False)
+    """
+
+    y = int(y); n = int(n)
+    if y < 0: raise ValueError, "y must not be negative"
+    if n < 1: raise ValueError, "n must be positive"
+    if y in (0, 1): return y, True
+    if n == 1: return y, True
+
+    # Search with Newton's method, starting from floating-point
+    # approximation. Care must be taken to avoid overflow.
+    from math import log as _log
+    guess = 2**int(_log(y, 2)/n)
+    xprev, x = -1, guess
+    while abs(x - xprev) > 1:
+        t = x**(n-1)
+        xprev, x = x, x - (t*x-y)//(n*t)
+    # Compensate
+    while x**n > y:
+        x -= 1
+    return x, x**n == y
+
+
 pyint = long
 makeinteger = lambda p: pyint.__new__(Integer, p)
 
@@ -187,10 +228,52 @@ class Integer(Rational, pyint):
 
     def __pow__(self, other):
         other = sympify(other)
+        r = self.try_power(other)
+        if r is not None:
+            return r
+        return NotImplemented
+
+    def try_power(self, other):
+        if self.is_zero:
+            if other.is_Number:
+                if other.is_negative:
+                    return Basic.inf
+                if other.is_positive:
+                    return self
+            if other.is_Infinity or other.is_ComplexInfinity:
+                return self
+            if other.is_NaN:
+                return other
+            return
+        if self.is_one:
+            return self
         if other.is_Integer:
+            if other.is_one:
+                return self
             if other.is_negative:
                 return Basic.Fraction(1, pyint.__pow__(self, -other.p))
             return Integer(pyint.__pow__(self, other))
-        return NotImplemented
+        if other.is_Float:
+            return self.as_Float ** other.as_Float
+        if other.is_Fraction:
+            if self==-1:
+                if other.q==2:
+                    return Basic.I ** other.p
+                return
+            if self.is_negative:
+                return (-1)**other * (-self)**other
+            r, exact = integer_nthroot(self.p, other.q)
+            if exact:
+                if other.p < 0:
+                    return Basic.Fraction(1, r ** (-other.p))
+                return Integer(r ** other.p)
+        if other.is_Infinity or other.is_ComplexInfinity:
+            if self.is_one:
+                return self
+            if self.is_negative:
+                return Basic.nan
+            return other
+        if other.is_NaN:
+            return other
 
     # __r*__ methods are defined in methods.py

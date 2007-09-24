@@ -11,6 +11,8 @@ class MutableMul(ArithMeths, RelationalMeths, MutableCompositeDict):
     instances.
     """
 
+    precedence = Basic.Mul_precedence
+
     # canonize methods
     
     def update(self, a, p=1):
@@ -53,11 +55,14 @@ class MutableMul(ArithMeths, RelationalMeths, MutableCompositeDict):
                 del self[k]
                 continue
             a = k.try_power(v)
-            if a is None: continue
-            del self[k]
+            if a is None:
+                continue
             if a.is_Number:
+                del self[k]
                 n *= a
             else:
+                if a==k and v==1: continue
+                del self[k]
                 self.update(a)
                 return self.canonical()
         if self.has_key(n):
@@ -121,7 +126,7 @@ class Mul(ImmutableMeths, MutableMul):
             return list(self.items()[0])
         return [self]
 
-    def tostr(self):
+    def tostr(self, level=0):
         seq = []
         items = sorted(self.items())
         for base, exp in items:

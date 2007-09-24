@@ -105,9 +105,6 @@ class Real(Number):
     def __new__(cls, f):
         return Float(f)
 
-    def torepr(self):
-        return '%s(%r)' % (self.__class__.__name__, self.as_native())
-
     @property
     def is_nonpositive(self):
         return self.is_negative or self.is_zero
@@ -144,7 +141,7 @@ class Rational(Real):
             return '%s(%r)' % (self.__class__.__name__, self.p)
         return '%s(%r, %r)' % (self.__class__.__name__, self.p, self.q)
 
-    def tostr(self):
+    def tostr(self, level=0):
         if self.q==1:
             return str(self.p)
         return '%s/%s' % (self.p, self.q)

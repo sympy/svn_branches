@@ -95,6 +95,8 @@ class ArithMeths:
     def try_power(self, exponent):
         """ Try evaluating power self ** exponent.
         Return None if no evaluation is carried out.
+        Caller code must ensure that exponent is
+        a Basic instance.
         """
         return
 

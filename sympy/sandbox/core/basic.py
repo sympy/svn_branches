@@ -1,5 +1,6 @@
 
 ordering_of_classes = [
+    'ImaginaryUnit','Infinity','ComplexInfinity','NaN','Exp1',
     'Integer','Fraction','Real','Interval',
     'Symbol',
     'MutableMul', 'Mul', 'MutableAdd', 'Add',
@@ -57,6 +58,14 @@ class Basic(object):
 
     __metaclass__ = BasicType
     undefined_Function = False
+
+    Lambda_precedence = 1
+    Add_precedence = 40
+    Mul_precedence = 50
+    Pow_precedence = 60
+    Apply_precedence = 70
+    Item_precedence = 75
+    Atom_precedence = 1000
 
     @staticmethod
     def sympify(a):

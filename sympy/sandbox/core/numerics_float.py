@@ -290,6 +290,10 @@ class Float(Real, tuple):
         """Print slightly more prettily than __repr__"""
         return binary_to_decimal(s.man, s.exp, Float._dps)
 
+    def torepr(self):
+        st = "Float('%s')"
+        return '%s(%r)' % (self.__class__.__name__,
+                           binary_to_decimal(self.man, self.exp, Float._dps + 2))
 
     #------------------------------------------------------------------
     # Comparisons
@@ -497,18 +501,35 @@ class Float(Real, tuple):
             return Basic.Mul(other, makefloat_from_fraction(1,1) / self)
         return sympify(other) / self
 
-    def __pow__(s, n):
-        if isinstance(n, (int, long, Basic.Integer)):
-            return Float(fpow(s, n, Float._prec, Float._mode))
-        n = sympify(n)
-        if n.is_Rational:
-            n = n.as_Float
-        if n.is_Float:
-            if n == 0.5:
-                return Float(fsqrt(s, Float._prec, Float._mode))
-            from numerics.functions import exp, log
-            return exp(n * log(s))
+    def __pow__(self, other):
+        other = sympify(other)
+        r = self.try_power(other)
+        if r is not None:
+            return r
         return NotImplemented
+
+    def try_power(self, other):
+        if other.is_Integer:
+            return Float(fpow(self, other, Float._prec, Float._mode))
+        if other.is_Fraction:
+            other = other.as_Float
+        if other.is_Float:
+            if other == 0.5:
+                return Float(fsqrt(self, Float._prec, Float._mode))
+            from numerics.functions import exp, log
+            return exp(other * log(self))
+        if other.is_Infinity or other.is_ComplexInfinity:
+            if -1 < self < 1:
+                return Basic.zero
+            if self==1:
+                return self
+            if self > 1:
+                return other
+            return Basic.nan
+        if other.is_NaN:
+            if self==0:
+                return self
+            return other
 
     def __rpow__(self, other):
         if isinstance(other, Basic):

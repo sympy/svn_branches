@@ -30,7 +30,7 @@ class Symbol(ArithMeths, RelationalMeths, Atom, str):
             return '%s(%r, dummy=True)' % (self.__class__.__name__, str(self))
         return '%s(%r)' % (self.__class__.__name__, str(self))
 
-    def tostr(self):
+    def tostr(self, level=0):
         return str(self)
 
     def compare(self, other):
