@@ -95,7 +95,6 @@ class Basic(object):
         if self is other: return 0
         c = cmp(self.__class__, other.__class__)
         if c: return c
-        #
         return cmp(id(self), id(other))
 
     def __nonzero__(self):

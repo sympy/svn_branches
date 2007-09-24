@@ -8,9 +8,10 @@ following templates:
     def __<mth>__(self, other)
         other = sympify(other)
         if other.is_<class convertable to self class>:
+            # applicable to Number classes
             other = other.as_<self class>
         if other.is_<same class as self>:
-            ...
+            ...<return result>
         return NotImplemented
 
     def __r<mth>__(self, other)
