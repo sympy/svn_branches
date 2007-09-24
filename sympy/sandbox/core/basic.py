@@ -34,6 +34,7 @@ class BasicType(type):
 
     def __cmp__(cls, other):
         if cls is other: return 0
+        assert isinstance(other,type),`other.__class__`
         n1 = cls.__name__
         n2 = other.__name__
         unknown = len(ordering_of_classes)+1
@@ -80,7 +81,7 @@ class Basic(object):
             return self.tostr()
         raise ValueError, "bad value for Basic.repr_level"
 
-    def tostr(self):
+    def tostr(self, level=0):
         return self.torepr()
 
     def compare(self, other):
@@ -101,7 +102,7 @@ class Basic(object):
         # prevent using constructs like:
         #   a = Symbol('a')
         #   if a: ..
-        raise AssertionError("only Equality|Unequality can define __nonzero__ method, %r" % (self.__class__))
+        raise AssertionError("only Relational and Number classes can define __nonzero__ method, %r" % (self.__class__))
 
 
 class Atom(Basic):

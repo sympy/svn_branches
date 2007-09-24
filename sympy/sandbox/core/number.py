@@ -116,6 +116,9 @@ class Real(Number):
     def is_nonnegative(self):
         return self.is_positive or self.is_zero
 
+    def __nonzero__(self):
+        return self!=0
+
 class Rational(Real):
 
     """ Base class for Integer and Fraction.
