@@ -30,34 +30,36 @@ class ImaginaryUnit(ArithMeths, RelationalMeths, Atom):
             return -Basic.I
         return
 
-I = ImaginaryUnit()
-Basic.I = I
-
-
 class Exp1(NumberSymbol):
 
     def tostr(self, level=0):
         return 'E'
 
+    def evalf(self):
+        return Basic.exp(Float(1))
 
 class Pi(NumberSymbol):
 
     def tostr(self, level=0):
         return "pi"
 
-pi = Pi()
+
 
 class GoldenRatio(NumberSymbol):
 
-    pass
+    def tostr(self, level=0):
+        return 'GoldenRatio'
 
 class EulerGamma(NumberSymbol):
 
-    pass
+    def tostr(self, level=0):
+        return 'EulerGamma'
 
 class Catalan(NumberSymbol):
 
-    pass
+    def tostr(self, level=0):
+        return 'Catalan'
+
 
 class NaN(NumberSymbol):
 
@@ -107,11 +109,25 @@ class ComplexInfinity(NumberSymbol):
             if other.is_negative:
                 return Basic.zero
 
+I = ImaginaryUnit()
 nan = NaN()
 oo = Infinity()
 zoo = ComplexInfinity()
 E = Exp1()
+pi = Pi()
+
 Basic.nan = nan
 Basic.oo = oo
 Basic.zoo = zoo
 Basic.E = E
+Basic.I = I
+Basic.pi = pi
+
+Basic.predefined_objects.update(
+    pi = pi,
+    nan = nan,
+    oo = oo,
+    zoo = zoo,
+    E = E,
+    I = I,
+    )

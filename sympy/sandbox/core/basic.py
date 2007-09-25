@@ -37,7 +37,8 @@ class BasicType(type):
 
     def __cmp__(cls, other):
         if cls is other: return 0
-        assert isinstance(other,type),`other.__class__`
+        if not isinstance(other, type):
+            return cmp(cls, other.__class__) or -1            
         n1 = cls.__name__
         n2 = other.__name__
         unknown = len(ordering_of_classes)+1
@@ -140,13 +141,14 @@ class Basic(object):
     repr_level = 1
 
     def __repr__(self):
-        if isinstance(self, type):
-            return self.__class__.torepr(self)
         if Basic.repr_level == 0:
             return self.torepr()
         if Basic.repr_level == 1:
             return self.tostr()
         raise ValueError, "bad value for Basic.repr_level"
+
+    def __str__(self):
+        return self.tostr()
 
     def tostr(self, level=0):
         return self.torepr()
@@ -171,6 +173,8 @@ class Basic(object):
         #   if a: ..
         raise AssertionError("only Relational and Number classes can define __nonzero__ method, %r" % (self.__class__))
 
+    def get_precedence(self):
+        raise NotImplementedError('%s.get_precedence()' % (self.__class__.__name__))
 
 class Atom(Basic):
 
@@ -178,6 +182,9 @@ class Atom(Basic):
 
     def torepr(self):
         return '%s()' % (self.__class__.__name__)
+
+    def get_precedence(self):
+        return Basic.Atom_precedence
 
 class Composite(Basic):
 

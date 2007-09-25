@@ -1,6 +1,6 @@
 
 from utils import memoizer_immutable_args, memoizer_Symbol_new
-from basic import Atom
+from basic import Atom, Basic
 from methods import ArithMeths, RelationalMeths
 
 class Symbol(ArithMeths, RelationalMeths, Atom, str):
@@ -31,7 +31,7 @@ class Symbol(ArithMeths, RelationalMeths, Atom, str):
         return '%s(%r)' % (self.__class__.__name__, str(self))
 
     def tostr(self, level=0):
-        return str(self)
+        return str.__str__(self)
 
     def compare(self, other):
         if self is other: return 0
@@ -41,4 +41,7 @@ class Symbol(ArithMeths, RelationalMeths, Atom, str):
             return cmp(id(self), id(other))
         return cmp(str(self), str(other))
 
-    
+    def __call__(self, *args):
+        signature = Basic.FunctionSignature((Basic,)*len(args), (Basic,))
+        return Basic.SingleValuedFunction(self, signature)(*args)
+

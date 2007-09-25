@@ -137,14 +137,22 @@ class Rational(Real):
         return Fraction(p, q)
 
     def torepr(self):
+        p = repr(self.p)
+        if p.endswith('L'): p = p[:-1]
+        q = repr(self.q)
+        if q.endswith('L'): q = q[:-1]
         if self.q==1:
-            return '%s(%r)' % (self.__class__.__name__, self.p)
-        return '%s(%r, %r)' % (self.__class__.__name__, self.p, self.q)
+            return '%s(%s)' % (self.__class__.__name__, p)
+        return '%s(%s, %s)' % (self.__class__.__name__, p, q)
 
     def tostr(self, level=0):
+        p = repr(self.p)
+        if p.endswith('L'): p = p[:-1]
+        q = repr(self.q)
+        if q.endswith('L'): q = q[:-1]
         if self.q==1:
-            return str(self.p)
-        return '%s/%s' % (self.p, self.q)
+            return p
+        return '%s/%s' % (p, q)
 
     @property
     def is_positive(self):

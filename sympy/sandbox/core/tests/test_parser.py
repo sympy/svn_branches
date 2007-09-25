@@ -1,7 +1,7 @@
 
-from sympy.sandbox import Symbol, sympify, Fraction, sin, Function
+from sympy.sandbox import Symbol, sympify, Fraction, sin, Function, pi
 
-def test_parder():
+def test_parser():
     x = Symbol('x')
     f = Function('f')
     assert sympify('x')==x
@@ -12,7 +12,11 @@ def test_parder():
     assert sympify('5/15')==Fraction(1,3)
     assert sympify('x*2')==2*x
     assert sympify('sin(x)')==sin(x)
-    #assert sympify('f(x)+sin(x)')==sin(x)+f(x)
+    assert sympify('pi')==pi
+    assert sympify('f(x)')==f(x)
+    assert sympify('sin(x)+1')==sin(x)+1
+    assert sympify('f(x)+1')==f(x)+1
+    assert sympify('f(x)+sin(x)')==f(x)+sin(x)
     
 if __name__ == '__main__':
     test_parser()

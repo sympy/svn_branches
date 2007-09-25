@@ -1,5 +1,36 @@
 all_caches = {}
 
+class dualmethod(object):
+    """dualmethod decorator.
+    
+    Enable calling a method as a class method or as an instance method
+    provided that both metaclass and class define methods with the
+    same name.
+    """
+    # got the idea from http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/523033
+    
+    def __init__(self, func):
+        self.func = func
+        self.method_name = func.__name__
+        self.class_wrapper_name = '%s.%s(<type>) wrapper' \
+                                  % (type.__name__, self.func.__name__)
+        self.instance_wrapper_name = '%s.%s(<instance>) wrapper' \
+                                     % (type.__name__, self.func.__name__)
+        
+    def __get__(self, obj, typ=None):
+        if obj is None:
+            def class_wrapper(*args, **kw):
+                return getattr(typ.__class__,
+                               self.method_name)(typ, *args, **kw)
+            class_wrapper.__name__ = self.class_wrapper_name
+            return class_wrapper
+        else:
+            def instance_wrapper(*args, **kw):
+                return self.func(obj, *args, **kw)
+            instance_wrapper.__name__ = self.instance_wrapper_name
+            return instance_wrapper
+
+
 def memoizer_immutable_args(name):
     def make_memoized(func):
         #return func

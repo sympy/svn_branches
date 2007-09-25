@@ -1,4 +1,6 @@
 
+import types
+from utils import dualmethod
 from basic import Atom, Composite, Basic, BasicType
 from methods import ArithMeths
 
@@ -53,15 +55,19 @@ class FunctionSignature:
                                self.value_classes)
 
 
+Basic.FunctionSignature = FunctionSignature
+
 class FunctionClass(ArithMeths, Atom, BasicType):
     """
     Base class for function classes. FunctionClass is a subclass of type.
 
     Use Function('<function name>' [ , signature ]) to create
     undefined function classes.
+
     """
 
     _new = type.__new__
+    precedence = Basic.Atom_precedence
 
     def __new__(cls, arg1, arg2, arg3=None, **options):
         assert not options,`options`
@@ -73,21 +79,50 @@ class FunctionClass(ArithMeths, Atom, BasicType):
             if signature is not None:
                 attrdict['signature'] = signature
             bases = (ftype,)
+            cls.set_methods_as_dual(name, attrdict)
             func = type.__new__(cls, name, bases, attrdict)
         else:
             name, bases, attrdict = arg1, arg2, arg3
+            cls.set_methods_as_dual(name, attrdict)
             func = type.__new__(cls, name, bases, attrdict)
             Basic.predefined_objects[name] = func
+
         return func
 
+    @classmethod
+    def set_methods_as_dual(cls, name, attrdict):
+        for k in attrdict.keys():
+            if k in ['__new__', '__init__']:
+                continue
+            mth = attrdict[k]
+            if isinstance(mth, types.FunctionType) and hasattr(cls,k):
+                # be verbose for a while:
+                print 'making',name,'method dual:', mth
+                attrdict[k] = dualmethod(mth)
+
     def torepr(cls):
+        if cls.undefined_Function:
+            for b in cls.__bases__:
+                if b.__name__.endswith('Function'):
+                    return "%s('%s')" % (b.__name__, cls.__name__)
+            return "Function('%s')" % (cls.__name__)
+        return type.__repr__(cls)
+
+    def tostr(cls, level=0):
         return cls.__name__
+
+    def get_precedence(cls):
+        return Basic.Atom_precedence
 
 
 class Function(Composite, tuple):
     """
     Base class for applied functions.
     Constructor of undefined classes.
+
+    If Function class (or its derivative) defines a method that FunctionClass
+    also has then this method will be dualmethod, i.e. the method can be
+    called as class method as well as an instance method.
     """
 
     __metaclass__ = FunctionClass
@@ -96,6 +131,10 @@ class Function(Composite, tuple):
 
     def __new__(cls, *args, **options):
         if cls.__name__.endswith('Function'):
+            if cls is Function and len(args)==1:
+                # Default function signature is of SingleValuedFunction
+                # that provides basic arithmetic methods.
+                cls = SingleValuedFunction
             return FunctionClass(cls, *args, **options)
         args = map(Basic.sympify, args)
         cls.signature.validate(args)
@@ -111,21 +150,24 @@ class Function(Composite, tuple):
     def canonize(cls, args, **options):
         return
 
+    def torepr(self):
+        return '%s(%s)' % (self.__class__.torepr(),
+                           ', '.join([a.torepr() for a in self[:]]))
+
+    def tostr(self, level=0):
+        p = self.get_precedence()
+        r = '%s(%s)' % (self.__class__.tostr(),
+                        ', '.join([a.tostr() for a in self[:]]))
+        if level<=p:
+            return '(%s)' % (r)
+        return r
+
+    def get_precedence(self):
+        return Basic.Apply_precedence
+
 
 class SingleValuedFunction(ArithMeths, Function):
     """
     Single-valued functions.
     """
     signature = FunctionSignature(None, (Basic,))
-
-
-'''
-class sin(SingleValuedFunction):
-
-    signature = FunctionSignature((Basic,), (Basic,))
-
-    @classmethod
-    def canonize(cls, (x,), **options):
-        if x==0: return x
-        return
-'''
