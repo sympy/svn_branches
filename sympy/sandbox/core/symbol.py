@@ -45,3 +45,5 @@ class Symbol(ArithMeths, RelationalMeths, Atom, str):
         signature = Basic.FunctionSignature((Basic,)*len(args), (Basic,))
         return Basic.SingleValuedFunction(self, signature)(*args)
 
+    def as_dummy(self):
+        return self.__class__(str(self), dummy=True)

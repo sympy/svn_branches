@@ -110,6 +110,8 @@ class ArithMeths:
 
 class ImmutableMeths:
 
+    is_immutable = True
+
     def __setitem__(self, k, v):
         raise TypeError('%s instance is immutable' % (self.__class__.__name__))
 

@@ -1,7 +1,7 @@
 
 import types
 from utils import dualmethod
-from basic import Atom, Composite, Basic, BasicType
+from basic import Atom, Composite, Basic, BasicType, sympify
 from methods import ArithMeths
 
 class FunctionSignature:
@@ -65,10 +65,6 @@ class FunctionClass(ArithMeths, Atom, BasicType):
     undefined function classes.
 
     """
-
-    _new = type.__new__
-    precedence = Basic.Atom_precedence
-
     def __new__(cls, arg1, arg2, arg3=None, **options):
         assert not options,`options`
         if isinstance(arg1, type):
@@ -83,10 +79,9 @@ class FunctionClass(ArithMeths, Atom, BasicType):
             func = type.__new__(cls, name, bases, attrdict)
         else:
             name, bases, attrdict = arg1, arg2, arg3
-            cls.set_methods_as_dual(name, attrdict)
             func = type.__new__(cls, name, bases, attrdict)
+            cls.set_methods_as_dual(name, func.__dict__)
             Basic.predefined_objects[name] = func
-
         return func
 
     @classmethod
@@ -99,6 +94,8 @@ class FunctionClass(ArithMeths, Atom, BasicType):
                 # be verbose for a while:
                 print 'making',name,'method dual:', mth
                 attrdict[k] = dualmethod(mth)
+            elif isinstance(mth, types.UnboundMethodType):
+                print k,mth
 
     def torepr(cls):
         if cls.undefined_Function:
@@ -114,6 +111,8 @@ class FunctionClass(ArithMeths, Atom, BasicType):
     def get_precedence(cls):
         return Basic.Atom_precedence
 
+    def try_power(cls, exponent):
+        return
 
 class Function(Composite, tuple):
     """
@@ -145,6 +144,10 @@ class Function(Composite, tuple):
         elif not isinstance(r, tuple):
             args = (r,)
         return tuple.__new__(cls, args)
+
+    @property
+    def args(self):
+        return tuple(self)
         
     @classmethod
     def canonize(cls, args, **options):
@@ -165,9 +168,79 @@ class Function(Composite, tuple):
     def get_precedence(self):
         return Basic.Apply_precedence
 
+    def subs(self, old, new):
+        old = sympify(old)
+        new = sympify(new)
+        if self==old:
+            return new
+        func = self.__class__
+        flag = False
+        if func==old:
+            func = new
+        if func is not self.__class__:
+            flag = True
+        args = []
+        for a in self.args:
+            new_a = a.subs(old, new)
+            if new_a==a:
+                new_a = a
+            if new_a is not a:
+                flag = True
+            args.append(new_a)
+        if flag:
+            return func(*args)
+        return self
+
+    def try_power(self, exponent):
+        return
 
 class SingleValuedFunction(ArithMeths, Function):
     """
     Single-valued functions.
     """
     signature = FunctionSignature(None, (Basic,))
+
+
+class Lambda(FunctionClass):
+
+    def __new__(cls, arguments, expression):
+        if not isinstance(arguments, (tuple,list)):
+            arguments = [sympify(arguments)]
+        else:
+            arguments = map(sympify, arguments)
+        expr = sympify(expression)
+        if expr.is_Function and tuple(arguments)==expr.args:
+            return expr.__class__
+        args = []
+        for a in arguments:
+            d = a.as_dummy()
+            expr = expr.subs(a, d)
+            args.append(d)
+        args = tuple(args)
+        name = 'Lambda(%s, %s)' % (args, expr)
+        bases = (LambdaFunction,)
+        attrdict = LambdaFunction.__dict__.copy()
+        attrdict['_args'] = args
+        attrdict['_expr'] = expr
+        attrdict['nofargs'] = len(args)
+        func = type.__new__(cls, name, bases, attrdict)        
+        return func
+
+    def __init__(cls,*args):
+        pass
+
+class LambdaFunction(Function):
+    """ Defines Lambda function properties.
+    
+    LambdaFunction instance will never be created.
+    """
+
+    def __new__(cls, *args):
+        n = cls.nofargs
+        if n!=len(args):
+            raise TypeError('%s takes exactly %s arguments (got %s)'\
+                            % (cls, n, len(args)))
+        expr = cls._expr
+        for d,a in zip(cls._args, args):
+            expr = expr.subs(d,sympify(a))
+        return expr

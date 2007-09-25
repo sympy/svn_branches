@@ -1,11 +1,15 @@
 
 from parser import Expr
+from utils import memoizer_immutable_args
 
 ordering_of_classes = [
+    'int','long',
+    
     'ImaginaryUnit','Infinity','ComplexInfinity','NaN','Exp1','Pi',
     'Integer','Fraction','Real','Interval',
     'Symbol',
     'MutableMul', 'Mul', 'MutableAdd', 'Add',
+    'FunctionClass',
     'Function',
     'sin','cos',
     'Equality','Unequality','StrictInequality','Inequality',
@@ -45,12 +49,14 @@ class BasicType(type):
         try:
             i1 = ordering_of_classes.index(n1)
         except ValueError:
-            print 'ordering_of_classes is missing',n1
+            if not cls.undefined_Function:
+                print 'ordering_of_classes is missing',n1,cls
             i1 = unknown
         try:
             i2 = ordering_of_classes.index(n2)
         except ValueError:
-            print 'ordering_of_classes is missing',n2
+            if not other.undefined_Function:
+                print 'ordering_of_classes is missing',n2,other
             i2 = unknown
         if i1 == unknown and i2 == unknown:
             return cmp(n1, n2)
@@ -176,6 +182,13 @@ class Basic(object):
     def get_precedence(self):
         raise NotImplementedError('%s.get_precedence()' % (self.__class__.__name__))
 
+    def subs(self, old, new):
+        old = sympify(old)
+        new = sympify(new)
+        if self==old:
+            return new
+        return self
+
 class Atom(Basic):
 
     canonical = evalf = lambda self: self
@@ -230,6 +243,8 @@ class MutableCompositeDict(Composite, dict):
         Add(MutableMul(2).canonical(),3) -> Integer(5)
     """
 
+    is_immutable = False
+
     # constructor methods
     def __new__(cls, *args):
         """
@@ -255,6 +270,43 @@ class MutableCompositeDict(Composite, dict):
         if c: return c
         return dict.__cmp__(self, other)
 
+    @memoizer_immutable_args('MutableCompositeDict.as_tuple')
+    def as_tuple(self):
+        """
+        Use only when self is immutable.
+        """
+        assert self.is_immutable,\
+               '%s.as_tuple() can only be used if instance is immutable' \
+               % (self.__class__.__name__)
+        return tuple(sorted(self.items()))
+
+    def __getitem__(self, key):
+        if self.is_immutable:
+            if isinstance(key, slice) or key.__class__ in [int, long]:
+                return self.as_tuple()[key]
+        return dict.__getitem__(self, key)
+
+    def subs(self, old, new):
+        old = sympify(old)
+        new = sympify(new)
+        if self==old:
+            return new
+        lst = []
+        flag = False
+        for (term, coeff) in self[:]:
+            new_term = term.subs(old, new)
+            if new_term==term:
+                new_term = term
+            if new_term is not term:
+                flag = True
+            lst.append((new_term, coeff))
+        if flag:
+            cls = getattr(Basic,'Mutable'+self.__class__.__name__)
+            r = cls()
+            for (term, coeff) in lst:
+                r.update(term, coeff)
+            return r.canonical()
+        return self
 
 sympify = Basic.sympify
 Expr.register_handler(Basic)
