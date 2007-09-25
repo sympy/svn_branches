@@ -73,10 +73,12 @@ class FunctionClass(ArithMeths, Atom, BasicType):
             if signature is not None:
                 attrdict['signature'] = signature
             bases = (ftype,)
-            return type.__new__(cls, name, bases, attrdict)
+            func = type.__new__(cls, name, bases, attrdict)
         else:
             name, bases, attrdict = arg1, arg2, arg3
-            return type.__new__(cls, name, bases, attrdict)
+            func = type.__new__(cls, name, bases, attrdict)
+            Basic.predefined_objects[name] = func
+        return func
 
     def torepr(cls):
         return cls.__name__

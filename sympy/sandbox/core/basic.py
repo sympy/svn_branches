@@ -1,6 +1,8 @@
 
+from parser import Expr
+
 ordering_of_classes = [
-    'ImaginaryUnit','Infinity','ComplexInfinity','NaN','Exp1',
+    'ImaginaryUnit','Infinity','ComplexInfinity','NaN','Exp1','Pi',
     'Integer','Fraction','Real','Interval',
     'Symbol',
     'MutableMul', 'Mul', 'MutableAdd', 'Add',
@@ -68,16 +70,72 @@ class Basic(object):
     Atom_precedence = 1000
 
     @staticmethod
-    def sympify(a):
+    def sympify(a, sympify_lists=False):
+        """Converts an arbitrary expression to a type that can be used
+           inside sympy. For example, it will convert python int's into
+           instance of sympy.Integer, floats into intances of sympy.Float,
+           etc. It is also able to coerce symbolic expressions which does
+           inherit after Basic. This can be useful in cooperation with SAGE.
+
+           It currently accepts as arguments:
+               - any object defined in sympy (except maybe matrices [TODO])
+               - standard numeric python types: int, long, float, Decimal
+               - strings (like "0.09" or "2e-19")
+
+           If sympify_lists is set to True then sympify will also accept
+           lists, tuples and sets. It will return the same type but with
+           all of the entries sympified.
+
+           If the argument is already a type that sympy understands, it will do
+           nothing but return that value. This can be used at the begining of a
+           function to ensure you are working with the correct type.
+
+           >>> from sympy import *
+
+           >>> sympify(2).is_integer
+           True
+           >>> sympify(2).is_real
+           True
+
+           >>> sympify(2.0).is_real
+           True
+           >>> sympify("2.0").is_real
+           True
+           >>> sympify("2e-45").is_real
+           True
+
+        """
+
         if isinstance(a, Basic):
             return a
-        elif isinstance(a, bool):
+        if isinstance(a, bool):
             raise NotImplementedError("bool support")
-        elif isinstance(a, (int, long)):
+        if isinstance(a, (int, long)):
             return Basic.Integer(a)
-        elif isinstance(a, float):
+        if isinstance(a, float):
             return Basic.Float(a)
-        raise ValueError("%s is NOT a valid SymPy expression" % `a`)
+        if isinstance(a, complex):
+            real, imag = map(Basic.sympify, (a.real, a.imag))
+            ireal, iimag = int(real), int(imag)
+            if ireal + iimag*1j == a:
+                return ireal + iimag*Basic.I
+            return real + Basic.I * imag
+        if isinstance(a, (list, tuple)) and len(a) == 2:
+            return Basic.Interval(*a)
+        if isinstance(a, (list,tuple,set)) and sympify_lists:
+            return type(a)([Basic.sympify(x, True) for x in a])
+        if not isinstance(a, str):
+            # At this point we were given an arbitrary expression
+            # which does not inherit after Basic. This may be
+            # SAGE's expression (or something alike) so take
+            # its normal form via str() and try to parse it.
+            a = str(a)
+        try:
+            return Expr(a).tosymbolic()
+        except Exception, msg:
+            raise ValueError("%s is NOT a valid SymPy expression: %s" % (`a`, msg))
+
+    predefined_objects = {} # used by parser.
 
     repr_level = 1
 
@@ -190,4 +248,6 @@ class MutableCompositeDict(Composite, dict):
         if c: return c
         return dict.__cmp__(self, other)
 
+
 sympify = Basic.sympify
+Expr.register_handler(Basic)

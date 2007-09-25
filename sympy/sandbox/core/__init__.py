@@ -4,7 +4,7 @@
 #import sys
 #sys.setrecursionlimit(30)
 
-from basic import Basic #, S
+from basic import Basic, sympify #, S
 from symbol import Symbol #, Wild, symbols
 from number import Number, Real, Rational, Integer, Fraction, Float
 #from power import Pow

@@ -56,3 +56,4 @@ def test_nan():
 if __name__ == '__main__':
     test_I()
     test_oo()
+    test_nan()
