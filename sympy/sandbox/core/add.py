@@ -1,9 +1,9 @@
 
 from utils import memoizer_immutable_args
 from basic import Basic, MutableCompositeDict, sympify
-from methods import ArithMeths, ImmutableMeths, RelationalMeths
+from methods import ArithMeths, ImmutableMeths#, RelationalMeths
 
-class MutableAdd(ArithMeths, RelationalMeths, MutableCompositeDict):
+class MutableAdd(ArithMeths, MutableCompositeDict):
     """ Represents a sum.
 
     3 + a + 2*b is Add({1:3, a:1, b:2})
@@ -43,24 +43,26 @@ class MutableAdd(ArithMeths, RelationalMeths, MutableCompositeDict):
         """
         Add({}).update(a,p) -> Add({a:p})
         """
-        if a.__class__ is dict:
+        acls = a.__class__
+        if acls is dict:
             # construct Add instance from a canonical dictionary
             # it must contain Basic instances as keys as well as values.
             assert len(self)==0,`len(self)` # make sure no data is overwritten
             super(MutableAdd, self).update(a)
             return
+        if acls is tuple and len(a)==2:
+            self.update(*a)
+            return
         a = Basic.sympify(a)
-        if a.is_Number:
-            p = a * p
-            a = Basic.one
-        elif a.is_MutableAdd:
-            # (3*x) + ((2*x)*4) -> (3*x) + (8*x)
-            # Add({x:3}).update(Add({x:2}), 4) -> Add({x:3}).update(x,2*4)
+        if a.is_MutableAdd:
             for k,v in a.items():
                 self.update(k, v * p)
             return
+        if a.is_Number:
+            p = a * p
+            a = Basic.one
         try:
-            self[a] += p
+            self[a] = self[a] + p
         except KeyError:
             self[a] = sympify(p)
         return
@@ -74,7 +76,6 @@ class MutableAdd(ArithMeths, RelationalMeths, MutableCompositeDict):
                 # Add({a:0}) -> 0
                 del self[k]
         # turn self to an immutable instance
-        self.__class__ = Add
         if len(self)==0:
             return Basic.zero
         if len(self)==1:
@@ -85,6 +86,7 @@ class MutableAdd(ArithMeths, RelationalMeths, MutableCompositeDict):
             if v.is_one:
                 # Add({a:1}) -> a
                 return k
+        self.__class__ = Add
         return self
 
     # arithmetics methods
@@ -118,12 +120,18 @@ class Add(ImmutableMeths, MutableAdd):
         try:
             return self.__dict__['_cached_hash']
         except KeyError:
-            h = self._cached_hash = sum(map(hash, self.items()))
+            h = hash((self.__class__.__name__,)+ self.as_tuple())
+            self._cached_hash = h
         return h
+
+    def __getitem__(self, key):
+        if isinstance(key, slice) or key.__class__ in [int, long]:
+            return self.as_tuple()[key]
+        return dict.__getitem__(self, key)
 
     def split(self, op, *args, **kwargs):
         if op == "+" and len(self) > 1:
-            return sorted([c*x for x, c in self.items()])
+            return ([c*x for x, c in self[:]])
         if op == "*" and len(self) == 1:
             x, c = self.items()[0]
             return [c] + x.split(op, *args, **kwargs)
@@ -133,7 +141,7 @@ class Add(ImmutableMeths, MutableAdd):
 
     def tostr(self, level=0):
         seq = []
-        items = sorted(self.items())
+        items = self[:]
         p = self.precedence
         for term, coef in items:
             if coef > 0:
@@ -154,3 +162,9 @@ class Add(ImmutableMeths, MutableAdd):
         if p<=level:
             return '(%s)' % r
         return r
+
+    def expand(self, *args, **hints):
+        obj = self
+        if hints.get('basic', True):
+            obj = Add(*[(t.expand(*args, **hints), e) for (t,e) in self.items()])
+        return obj

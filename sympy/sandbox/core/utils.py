@@ -47,6 +47,7 @@ def memoizer_immutable_args(name):
             func_cache_it_cache[args] = r = func(*args)
             return r
         all_caches[name] = func_cache_it_cache
+        wrapper.__name__ = 'wrapper.%s' % (name)
         return wrapper
     return make_memoized
 
@@ -62,6 +63,7 @@ def memoizer_Symbol_new(func):
         func_cache_it_cache[name] = r = func(cls, name, dummy=dummy, **options)
         return r
     all_caches['Symbol.__new__'] = func_cache_it_cache
+    wrapper.__name__ = 'wrapper.Symbol.__new__'
     return wrapper
 
 def memoizer_Interval_new(func):

@@ -1,4 +1,4 @@
-def xtest_mul_performance():
+def test_mul_performance():
     from time import clock
     from random import randint
     from sympy.sandbox.core import Symbol, Mul, Add
@@ -50,7 +50,7 @@ def test_add_performance():
     d2 = t2-t1
     print '\ntiming Add(x, <random int>, y): sandbox.core %s secs, sympy.core %s secs' % (d1,d2)
 
-def test_sum_performance():
+def xtest_sum_performance():
     from time import clock
     from sympy.sandbox.core import Symbol, MutableAdd, Integer
     x = Symbol('x')

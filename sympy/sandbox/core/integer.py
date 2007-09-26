@@ -81,7 +81,7 @@ class Integer(Rational, pyint):
         other = Basic.sympify(other)
         if self is other: return True
         if other.is_Integer:
-            return pyint.__cmp__(self, pyint(other))==0
+            return pyint.__cmp__(self, other)==0
         return NotImplemented
 
     def __ne__(self, other):
@@ -233,6 +233,7 @@ class Integer(Rational, pyint):
             return r
         return NotImplemented
 
+    @memoizer_immutable_args('Integer.try_power')
     def try_power(self, other):
         if self.is_zero:
             if other.is_Number:

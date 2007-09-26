@@ -145,6 +145,21 @@ class Function(Composite, tuple):
             args = (r,)
         return tuple.__new__(cls, args)
 
+    def __hash__(self):
+        try:
+            return self.__dict__['_cached_hash']
+        except KeyError:
+            h = hash((self.__class__.__class__, tuple(self)))
+            self._cached_hash = h
+        return h
+
+    def __eq__(self, other):
+        other = sympify(other)
+        if other is self: return True
+        if not other.is_Function: return False
+        if not (other.__class__.__name__==self.__class__.__name__): return False
+        return tuple.__eq__(self, other)
+
     @property
     def args(self):
         return tuple(self)

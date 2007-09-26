@@ -1,9 +1,9 @@
 
 from utils import memoizer_immutable_args, memoizer_Symbol_new
-from basic import Atom, Basic
-from methods import ArithMeths, RelationalMeths
+from basic import Atom, Basic, sympify
+from methods import ArithMeths#, RelationalMeths
 
-class Symbol(ArithMeths, RelationalMeths, Atom, str):
+class Symbol(ArithMeths, Atom, str):
 
     """ Represents a symbol.
 
@@ -41,9 +41,24 @@ class Symbol(ArithMeths, RelationalMeths, Atom, str):
             return cmp(id(self), id(other))
         return cmp(str(self), str(other))
 
+    def __eq__(self, other):
+        other = sympify(other)
+        if self is other: return True
+        if self.__class__ is not other.__class__: return False
+        if self.is_dummy or other.is_dummy: return False
+        return str.__eq__(self, other)
+
     def __call__(self, *args):
         signature = Basic.FunctionSignature((Basic,)*len(args), (Basic,))
         return Basic.SingleValuedFunction(self, signature)(*args)
 
     def as_dummy(self):
         return self.__class__(str(self), dummy=True)
+
+    def __hash__(self):
+        try:
+            return self.__dict__['_cached_hash']
+        except KeyError:
+            h = str.__hash__(self)
+            self._cached_hash = h
+        return h

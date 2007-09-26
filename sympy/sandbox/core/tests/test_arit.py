@@ -95,15 +95,15 @@ def testpow():
 
     e=(a+b+c)**n2
     assert e == (a+b+c)**2
-    #assert e.expand() == 2*b*c+2*a*c+2*a*b+a**2+c**2+b**2
+    assert e.expand() == 2*b*c+2*a*c+2*a*b+a**2+c**2+b**2
 
     e=(a+b)**n2
     assert e == (a+b)**2
-    #assert e.expand() == 2*a*b+a**2+b**2
+    assert e.expand() == 2*a*b+a**2+b**2
 
     e=(a+b)**(n1/n2)
     assert e == (a+b)**(Rational(1)/2)
-    #assert e.expand() == (a+b)**(Rational(1)/2)
+    assert e.expand() == (a+b)**(Rational(1)/2)
 
     n=n5**(n1/n2)
     assert n == Rational(5)**(Rational(1)/2)
@@ -121,13 +121,13 @@ def testpow():
     x = Symbol('x')
     y = Symbol('y')
 
-    #assert ((x*y)**3).expand() == y**3 * x**3
-    #assert ((x*y)**-3).expand() == y**-3 * x**-3
+    assert ((x*y)**3).expand() == y**3 * x**3
+    assert ((x*y)**-3).expand() == y**-3 * x**-3
 
-    #assert (x**5*(3*x)**(3)).expand() == 27 * x**8
-    #assert (x**5*(-3*x)**(3)).expand() == -27 * x**8
-    #assert (x**5*(3*x)**(-3)).expand() == Rational(1,27) * x**2
-    #assert (x**5*(-3*x)**(-3)).expand() == -Rational(1,27) * x**2
+    assert (x**5*(3*x)**(3)).expand() == 27 * x**8
+    assert (x**5*(-3*x)**(3)).expand() == -27 * x**8
+    assert (x**5*(3*x)**(-3)).expand() == Rational(1,27) * x**2
+    assert (x**5*(-3*x)**(-3)).expand() == -Rational(1,27) * x**2
 
     #assert ((-x)**2)**Rational(1,3) == ((-x)**Rational(1,3))**2
     #assert (-x)**Rational(2,3) == x**Rational(2,3),`(-x)**Rational(2,3), x**Rational(2,3)`
@@ -138,34 +138,34 @@ def test_expand():
     p = Rational(5)
     e = (a+b)*c
     assert e == c*(a+b)
-    #assert (e.expand()-a*c-b*c) == Rational(0)
+    assert (e.expand()-a*c-b*c) == Rational(0)
     e=(a+b)*(a+b)
     assert e == (a+b)**2
-    #assert e.expand() == 2*a*b+a**2+b**2
+    assert e.expand() == 2*a*b+a**2+b**2
     e=(a+b)*(a+b)**Rational(2)
     assert e == (a+b)**3
-    #assert e.expand() == 3*b*a**2+3*a*b**2+a**3+b**3
-    #assert e.expand() == 3*b*a**2+3*a*b**2+a**3+b**3
+    assert e.expand() == 3*b*a**2+3*a*b**2+a**3+b**3
+    assert e.expand() == 3*b*a**2+3*a*b**2+a**3+b**3
     e=(a+b)*(a+c)*(b+c)
     assert e == (a+c)*(a+b)*(b+c)
-    #assert e.expand() == 2*a*b*c+b*a**2+c*a**2+b*c**2+a*c**2+c*b**2+a*b**2
+    assert e.expand() == 2*a*b*c+b*a**2+c*a**2+b*c**2+a*c**2+c*b**2+a*b**2
     e=(a+Rational(1))**p
     assert e == (1+a)**5
-    #assert e.expand() == 1+5*a+10*a**2+10*a**3+5*a**4+a**5
+    assert e.expand() == 1+5*a+10*a**2+10*a**3+5*a**4+a**5
     e=(a+b+c)*(a+c+p)
     assert e == (5+a+c)*(a+b+c)
-    #assert e.expand() == 5*a+5*b+5*c+2*a*c+b*c+a*b+a**2+c**2
+    assert e.expand() == 5*a+5*b+5*c+2*a*c+b*c+a*b+a**2+c**2
     #x=Symbol("x")
     #s=exp(x*x)-1
     #e=s.series(x,5)/x**2
     #assert e.expand() ==  1+x**2/2+O(x**3)
 
     # Check that this isn't too slow
-    #x = Symbol('x')
-    #W = 1
-    #for i in range(1, 21):
-    #    W = W * (x-i)
-    #W = W.expand()
+    x = Symbol('x')
+    W = 1
+    for i in range(1, 21):
+        W = W * (x-i)
+    W = W.expand()
     #assert W.has(-1672280820*x**15)
 
 
@@ -174,10 +174,10 @@ def test_power_expand():
     a = Symbol('a')
     b = Symbol('b')
     p = (a+b)**2
-    #assert p.expand() == a**2 + b**2 + 2*a*b
+    assert p.expand() == a**2 + b**2 + 2*a*b
 
     p = (1+2*(1+a))**2
-    #assert p.expand() == 9 + 4*(a**2) + 12*a
+    assert p.expand() == 9 + 4*(a**2) + 12*a
 
 def test_powerbug():
     x=Symbol("x")

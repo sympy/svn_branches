@@ -29,7 +29,7 @@ def test_poly_str():
             "-w*y**2*z**2 + x","x - z**2*w*y**2"]
 
 def test_bug1():
-    assert str(x-1*y*x*y) == "x - x*y**2"
+    assert str(x-1*y*x*y) in ["x - x*y**2",'-x*y**2 + x']
 
 def test_bug2():
     e = x-y

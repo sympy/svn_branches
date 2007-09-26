@@ -41,6 +41,14 @@ class Fraction(Rational, tuple):
     @property
     def q(self): return self[1]
 
+    def __hash__(self):
+        try:
+            return self.__dict__['_cached_hash']
+        except KeyError:
+            h = hash((self.__class__.__class__, tuple(self)))
+            self._cached_hash = h
+        return h
+
     def __eq__(self, other):
         other = Basic.sympify(other)
         if self is other: return True
@@ -104,7 +112,8 @@ class Fraction(Rational, tuple):
     def __add__(self, other):
         other = sympify(other)
         if other.is_Integer:
-            other = other.as_Fraction
+            return Fraction(self.p + self.q * other.p,
+                            self.q)
         if other.is_Fraction:
             return Fraction(self.p * other.q + self.q * other.p,
                             self.q * other.q)
@@ -113,7 +122,8 @@ class Fraction(Rational, tuple):
     def __sub__(self, other):
         other = sympify(other)
         if other.is_Integer:
-            other = other.as_Fraction
+            return Fraction(self.p - self.q * other.p,
+                            self.q)
         if other.is_Fraction:
             return Fraction(self.p * other.q - self.q * other.p,
                             self.q * other.q)
@@ -122,7 +132,7 @@ class Fraction(Rational, tuple):
     def __mul__(self, other):
         other = sympify(other)
         if other.is_Integer:
-            other = other.as_Fraction
+            return Fraction(self.p * other.p, self.q)
         if other.is_Fraction:
             return Fraction(self.p * other.p, self.q * other.q)
         return NotImplemented
@@ -130,7 +140,7 @@ class Fraction(Rational, tuple):
     def __div__(self, other):
         other = sympify(other)
         if other.is_Integer:
-            other = other.as_Fraction
+            return Fraction(self.p, self.q * other.p)
         if other.is_Fraction:
             return Fraction(self.p * other.q, self.q * other.p)
         return NotImplemented
@@ -142,6 +152,7 @@ class Fraction(Rational, tuple):
             return r
         return NotImplemented
 
+    @memoizer_immutable_args('Fraction.try_power')
     def try_power(self, other):
         if other.is_Integer:
             if other.is_negative:
@@ -169,7 +180,8 @@ class Fraction(Rational, tuple):
     def __radd__(self, other):
         if isinstance(other, Basic):
             if other.is_Integer:
-                other = other.as_Fraction
+                return Fraction(self.p + self.q * other.p,
+                                self.q)
             if other.is_Fraction:
                 return Fraction(self.p * other.q + self.q * other.p,
                                 self.q * other.q)
@@ -179,7 +191,8 @@ class Fraction(Rational, tuple):
     def __rsub__(self, other):
         if isinstance(other, Basic):
             if other.is_Integer:
-                other = other.as_Fraction
+                return Fraction(-self.p + self.q * other.p,
+                                self.q)
             if other.is_Fraction:
                 return Fraction(-self.p * other.q + self.q * other.p,
                                 self.q * other.q)
@@ -189,7 +202,7 @@ class Fraction(Rational, tuple):
     def __rmul__(self, other):
         if isinstance(other, Basic):
             if other.is_Integer:
-                other = other.as_Fraction
+                return Fraction(self.p * other.p, self.q)
             if other.is_Fraction:
                 return Fraction(self.p * other.p, self.q * other.q)
             return Basic.Mul(other, self)
@@ -198,7 +211,7 @@ class Fraction(Rational, tuple):
     def __rdiv__(self, other):
         if isinstance(other, Basic):
             if other.is_Integer:
-                other = other.as_Fraction
+                return Fraction(self.q * other.p, self.p)
             if other.is_Fraction:
                 return Fraction(self.q * other.p, self.p * other.q)
             return Basic.Mul(other, 1/self)

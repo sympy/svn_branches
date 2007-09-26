@@ -51,7 +51,7 @@ class Equality(Relational):
     def __new__(cls, lhs, rhs):
         sympify = cls.sympify
         lhs, rhs = sympify(lhs), sympify(rhs)
-        if lhs.compare(rhs)==0: return True
+        if lhs is rhs: return True
         return tuple.__new__(cls, (lhs, rhs))
 
     @memoizer_immutable_args('Equality.__nonzero__')
@@ -67,7 +67,7 @@ class Unequality(Relational):
     def __new__(cls, lhs, rhs):
         sympify = cls.sympify
         lhs, rhs = sympify(lhs), sympify(rhs)
-        if lhs.compare(rhs)==0: return False
+        if lhs is rhs: return False
         return tuple.__new__(cls, (lhs, rhs))
 
     @memoizer_immutable_args('Unequality.__nonzero__')

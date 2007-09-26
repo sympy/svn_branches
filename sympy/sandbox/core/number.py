@@ -62,6 +62,7 @@ class Number(NumberMeths, Atom):
         if self.is_Integer: return self
         raise NotImplementedError(`self`)
 
+    @memoizer_immutable_args('Number.try_power')
     def try_power(self, other):
         r = self.__pow__(other)
         if r is not NotImplemented:
@@ -167,6 +168,11 @@ class Rational(Real):
         c = cmp(self.__class__, other.__class__)
         if c: return c
         return cmp(self.p*other.q, self.q*other.p)
+
+    def __eq__(self, other):
+        other = sympify(other)
+        if self is other: return True
+        return self.p*other.q==self.q*other.p
 
     def evalf(self):
         return Basic.Float(self.p) / Basic.Float(self.q)

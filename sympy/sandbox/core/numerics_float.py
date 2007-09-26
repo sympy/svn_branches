@@ -508,6 +508,7 @@ class Float(Real, tuple):
             return r
         return NotImplemented
 
+    @memoizer_immutable_args('Float.try_power')
     def try_power(self, other):
         if other.is_Integer:
             return Float(fpow(self, other, Float._prec, Float._mode))

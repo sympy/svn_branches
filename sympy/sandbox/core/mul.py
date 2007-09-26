@@ -1,9 +1,9 @@
 
 from utils import memoizer_immutable_args
 from basic import Basic, MutableCompositeDict, sympify
-from methods import ArithMeths, ImmutableMeths, RelationalMeths
+from methods import ArithMeths, ImmutableMeths#, RelationalMeths
 
-class MutableMul(ArithMeths, RelationalMeths, MutableCompositeDict):
+class MutableMul(ArithMeths, MutableCompositeDict):
     """Mutable base class for Mul. This class is used temporarily
     during construction of Mul objects.
 
@@ -25,6 +25,9 @@ class MutableMul(ArithMeths, RelationalMeths, MutableCompositeDict):
             assert len(self)==0,`len(self)` # make sure no data is overwritten
             assert p is 1,`p`
             super(MutableMul, self).update(a)
+            return
+        if a.__class__ is tuple and len(a)==2:
+            self.update(*a)
             return
         a = Basic.sympify(a)
         if a.is_MutableAdd and len(a)==1:
@@ -113,22 +116,28 @@ class Mul(ImmutableMeths, MutableMul):
         try:
             return self.__dict__['_cached_hash']
         except KeyError:
-            h = self._cached_hash = sum(map(hash, self.items()))
+            h = hash((self.__class__.__name__,)+ self.as_tuple())
+            self._cached_hash = h
         return h
+    
+    def __getitem__(self, key):
+        if isinstance(key, slice) or key.__class__ in [int, long]:
+            return self.as_tuple()[key]
+        return dict.__getitem__(self, key)
 
     def canonical(self):
         return self
 
     def split(self, op, *args, **kwargs):
         if op == '*':
-            return sorted([x**c for x, c in self.items()])
+            return ([x**c for x, c in self[:]])
         if op == '**' and len(self) == 1:
             return list(self.items()[0])
         return [self]
 
     def tostr(self, level=0):
         seq = []
-        items = sorted(self.items())
+        items = self[:]
         for base, exp in items:
             basestr = base.tostr()
             if not (base.is_Symbol or (base.is_Integer and base > 0)):
@@ -142,6 +151,35 @@ class Mul(ImmutableMeths, MutableMul):
                 seq.append(basestr + "**" + expstr)
         return "*".join(seq)
 
+    def expand(self, *args, **hints):
+        """Expand an expression based on different hints. Currently
+           supported hints are basic, power, complex, trig and func.
+        """
+        obj = self
+        if hints.get('basic', True):
+            if len(self)==1:
+                base, exponent = self.items()[0]
+                b = base.expand(*args, **hints)
+                e = exponent.expand(*args, **hints)
+                obj = expand_integer_power(b, e)
+            elif len(self)==2:
+                b1,e1 = self.items()[0]
+                b2,e2 = self.items()[1]
+                b1 = b1.expand(*args, **hints)
+                e1 = e1.expand(*args, **hints)
+                b2 = b2.expand(*args, **hints)
+                e2 = e2.expand(*args, **hints)
+                p1 = expand_integer_power(b1, e1)
+                p2 = expand_integer_power(b2, e2)
+                obj = expand_mul2(p1, p2)
+            else:
+                b1,e1 = self.items()[0]
+                b1 = b1.expand(*args, **hints)
+                e1 = e1.expand(*args, **hints)
+                p1 = expand_integer_power(b1,e1)
+                p2 = Mul(*self.items()[1:]).expand(*args, **hints)
+                obj = expand_mul2(p1, p2)
+        return obj
 
 class Pow(Basic):
     """
@@ -155,9 +193,79 @@ class Pow(Basic):
         if b.is_zero: return Basic.one
         if b.is_one: return a
         if a.is_one: return a
-        m = MutableMul()
-        m.update(a,b)
-        return m.canonical()
+        return Mul((a,b))
 
 def sqrt(x):
     return Pow(x, Basic.Rational(1,2))
+
+@memoizer_immutable_args('expand_integer_power')
+def expand_integer_power(x, n):
+    """
+    x, n must be expanded
+    """
+    if x.is_Add and n.is_Integer and n.is_positive:
+        return expand_integer_power_miller(x, n)
+    return x ** n
+
+@memoizer_immutable_args('expand_mul2')
+def expand_mul2(x, y):
+    """
+    x, y must be expanded.
+    target must be None or MutableAdd instance.
+    """
+    if x.is_Add and y.is_Add:
+        sums = Basic.MutableAdd()
+        yt = y.items()
+        for (t1,c1) in x.items():
+            for (t2,c2) in yt:
+                sums.update(t1*t2,c1*c2)
+        return sums.canonical()
+    if x.is_Add:
+        return Basic.Add(*[(t1*y,c1) for (t1,c1) in x.items()])
+    if y.is_Add:
+        return expand_mul2(y, x)
+    return x * y
+
+@memoizer_immutable_args('expand_integer_power_miller')
+def expand_integer_power_miller(x, m):
+    """
+    x, m must be expanded
+    x must be Add instance
+    m must be positive integer
+    """
+    ## Consider polynomial
+    ##   P(x) = sum_{i=0}^n p_i x^k
+    ## and its m-th exponent
+    ##   P(x)^m = sum_{k=0}^{m n} a(m,k) x^k
+    ## The coefficients a(m,k) can be computed using the
+    ## J.C.P. Miller Pure Recurrence [see D.E.Knuth,
+    ## Seminumerical Algorithms, The art of Computer
+    ## Programming v.2, Addison Wesley, Reading, 1981;]:
+    ##  a(m,k) = 1/(k p_0) sum_{i=1}^n p_i ((m+1)i-k) a(m,k-i),
+    ## where a(m,0) = p_0^m.
+    Fraction = Basic.Fraction
+    MutableAdd = Basic.MutableAdd
+    Add = Basic.Add
+    m = int(m)
+    xt = x.items()
+    n = len(xt)-1
+    a,b = xt[0]
+    x0 = a * b
+    p0 = [c*t/x0 for (t,c) in xt]
+    l = [x0**m]
+    for k in xrange(1, m * n + 1):
+        l1 = []
+        for i in xrange(1,n+1):
+            if i<=k:
+                lk = l[k-i]
+                p0i = p0[i]
+                f = Fraction((m+1)*i-k,k)
+                p0if = p0i*f
+                if lk.is_Add:
+                    for t,c in lk.items():
+                        l1.append((t*p0if,c))
+                else:
+                    l1.append(lk*p0if)
+        a = Add(*l1)
+        l.append(a)
+    return Add(*l)

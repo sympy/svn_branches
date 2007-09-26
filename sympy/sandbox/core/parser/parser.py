@@ -156,7 +156,7 @@ class Base(object):
         return self.compare(other)
 
     def tosymbolic(self, commutative=True):
-        raise NotImplementedError,`self`
+        raise NotImplementedError(`self`)
 
     @property
     def handler(self):
@@ -288,24 +288,36 @@ class BinaryOpBase(Base):
 
     def tosymbolic(self, commutative=True):
         op = self.items[1]
-        mth = {'+':'__add__','-':'__sub__',
-               '*':'__mul__','/':'__div__',
-               '**':'__pow__','>':'__gt__',
-               '<':'__lt__','>=':'__ge__',
-               '<=':'__le__','==':'__eq__',
-               '<>':'__ne__','!=':'__ne__',
-               'and':'__and__','&':'__and__',
-               'or':'__or__','|':'__or__',
-               'xor':'__xor__','^':'__xor__',
+        mth,rmth = {'+':('__add__','__radd__'),
+                    '-':('__sub__','__rsub__'),
+                    '*':('__mul__','__rmul__'),
+                    '/':('__div__','__rdiv__'),
+                    '**':('__pow__','__rpow__'),
+                    '>':('__gt__','__lt__'),
+                    '<':('__lt__','__gt__'),
+                    '>=':('__ge__','__le__'),
+                    '<=':('__le__','__ge__'),
+                    '==':('__eq__','__eq__'),
+                    '<>':('__ne__','__ne__'),
+                    '!=':('__ne__','__ne__'),
+                    'and':('__and__','__rand__'),
+                    '&':('__and__','__rand__'),
+                    'or':('__or__','__ror__'),
+                    '|':('__or__','__ror__'),
+                    'xor':('__xor__,''__rxor__'),
+                    '^':('__xor__','__rxor__'),
                }.get(op, None)
         if not commutative:
-            if mth=='__mul__': mth = 'ncmul'
-            if mth=='__div__': mth = 'ncdiv'
+            if mth=='__mul__': mth,rmth = 'ncmul','rncmul'
+            if mth=='__div__': mth,rmth = 'ncdiv','rncdiv'
 
         if mth is not None:
             lhs = self.items[0].tosymbolic(commutative)
             rhs = self.items[2].tosymbolic(commutative)
-            return getattr(lhs,mth)(rhs)
+            r = getattr(lhs,mth)(rhs)
+            if r is NotImplemented:
+                r = getattr(rhs,rmth)(lhs)
+            return r
         return Base.tosymbolic(self. commutative)
 
 

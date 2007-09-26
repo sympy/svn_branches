@@ -1,15 +1,20 @@
 
 from utils import memoizer_immutable_args
 from basic import Atom, Basic, sympify
-from methods import ArithMeths, RelationalMeths
+from methods import ArithMeths#, RelationalMeths
 
-class NumberSymbol(ArithMeths, RelationalMeths, Atom):
+class NumberSymbol(ArithMeths, Atom):
 
     @memoizer_immutable_args('NumberSymbol.__new__')
     def __new__(cls):
         return object.__new__(cls)
 
-class ImaginaryUnit(ArithMeths, RelationalMeths, Atom):
+    def __eq__(self, other):
+        other = sympify(other)
+        if other is self: return True
+        return False
+
+class ImaginaryUnit(ArithMeths, Atom):
 
     @memoizer_immutable_args('ImaginaryUnit.__new__')
     def __new__(cls):
@@ -29,6 +34,11 @@ class ImaginaryUnit(ArithMeths, RelationalMeths, Atom):
             if e==2: return -Basic.one
             return -Basic.I
         return
+
+    def __eq__(self, other):
+        other = sympify(other)
+        if other is self: return True
+        return False
 
 class Exp1(NumberSymbol):
 

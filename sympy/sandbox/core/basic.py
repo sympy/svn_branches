@@ -173,6 +173,11 @@ class Basic(object):
         if c: return c
         return cmp(id(self), id(other))
 
+    def __eq__(self, other):
+        other = sympify(other)
+        if self is other: return True
+        return False
+
     def __nonzero__(self):
         # prevent using constructs like:
         #   a = Symbol('a')
@@ -189,6 +194,13 @@ class Basic(object):
             return new
         return self
 
+    def expand(self, *args, **hints):
+        """Expand an expression based on different hints. Currently
+           supported hints are basic, power, complex, trig and func.
+        """
+        return self
+
+
 class Atom(Basic):
 
     canonical = evalf = lambda self: self
@@ -199,10 +211,12 @@ class Atom(Basic):
     def get_precedence(self):
         return Basic.Atom_precedence
 
+
 class Composite(Basic):
 
     def torepr(self):
         return '%s(%s)' % (self.__class__.__name__,', '.join(map(repr, self)))
+
 
 class MutableCompositeDict(Composite, dict):
     """ Base class for MutableAdd, MutableMul, Add, Mul.
@@ -270,21 +284,26 @@ class MutableCompositeDict(Composite, dict):
         if c: return c
         return dict.__cmp__(self, other)
 
-    @memoizer_immutable_args('MutableCompositeDict.as_tuple')
+    def __eq__(self, other):
+        other = sympify(other)
+        if self is other: return True
+        if self.__class__ is not other.__class__: return False
+        return dict.__eq__(self, other)
+
     def as_tuple(self):
         """
         Use only when self is immutable.
         """
+        try:
+            return self.__dict__['_cached_as_tuple']
+        except KeyError:
+            pass
         assert self.is_immutable,\
                '%s.as_tuple() can only be used if instance is immutable' \
                % (self.__class__.__name__)
-        return tuple(sorted(self.items()))
-
-    def __getitem__(self, key):
-        if self.is_immutable:
-            if isinstance(key, slice) or key.__class__ in [int, long]:
-                return self.as_tuple()[key]
-        return dict.__getitem__(self, key)
+        r = tuple(sorted(self.items()))
+        self._cached_as_tuple = r
+        return r
 
     def subs(self, old, new):
         old = sympify(old)

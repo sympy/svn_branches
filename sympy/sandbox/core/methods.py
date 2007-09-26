@@ -21,7 +21,7 @@ following templates:
 
 """
 
-class RelationalMeths:
+class RelationalMeths_disable:
 
     def __eq__(self, other):
         if self is other: return True
@@ -121,7 +121,7 @@ class ImmutableMeths:
     def popitem(self):
         raise TypeError('%s instance is immutable' % (self.__class__.__name__))
 
-class NumberMeths(ArithMeths, RelationalMeths):
+class NumberMeths(ArithMeths):
 
     def __eq__(self, other):
         raise NotImplementedError('%s must implement __eq__ method' % (self.__class__.__name__))
