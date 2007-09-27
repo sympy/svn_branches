@@ -42,11 +42,12 @@ class Symbol(ArithMeths, Atom, str):
         return cmp(str(self), str(other))
 
     def __eq__(self, other):
-        other = sympify(other)
-        if self is other: return True
-        if self.__class__ is not other.__class__: return False
-        if self.is_dummy or other.is_dummy: return False
-        return str.__eq__(self, other)
+        try:
+            if not other.is_Symbol:
+                return False
+            return str.__eq__(self, other)
+        except AttributeError:
+            return self.__eq__(sympify(other))
 
     def __call__(self, *args):
         signature = Basic.FunctionSignature((Basic,)*len(args), (Basic,))
@@ -55,10 +56,4 @@ class Symbol(ArithMeths, Atom, str):
     def as_dummy(self):
         return self.__class__(str(self), dummy=True)
 
-    def __hash__(self):
-        try:
-            return self.__dict__['_cached_hash']
-        except KeyError:
-            h = str.__hash__(self)
-            self._cached_hash = h
-        return h
+    __hash__ = str.__hash__

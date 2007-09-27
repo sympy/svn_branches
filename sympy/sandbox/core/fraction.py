@@ -2,6 +2,7 @@ from utils import memoizer_immutable_args
 from basic import Basic, sympify
 from number import Rational
 
+@memoizer_immutable_args('makefraction')
 def makefraction(p,q):
     return tuple.__new__(Fraction, (p, q))
 
@@ -20,7 +21,7 @@ class Fraction(Rational, tuple):
     of Integer.
     """
 
-    @memoizer_immutable_args('Fraction.__new__')
+
     def __new__(cls, p, q):
         if q<0:
             p, q = -p, -q
@@ -30,7 +31,7 @@ class Fraction(Rational, tuple):
             q //= r
         if q==1:
             return Basic.Integer(p)
-        return tuple.__new__(cls, (p, q))
+        return makefraction(p,q)
 
     make = staticmethod(makefraction)
     make_from_man_exp = staticmethod(makefraction_from_man_exp)
@@ -41,22 +42,18 @@ class Fraction(Rational, tuple):
     @property
     def q(self): return self[1]
 
-    def __hash__(self):
-        try:
-            return self.__dict__['_cached_hash']
-        except KeyError:
-            h = hash((self.__class__.__class__, tuple(self)))
-            self._cached_hash = h
-        return h
+    __hash__ = tuple.__hash__
 
     def __eq__(self, other):
-        other = Basic.sympify(other)
-        if self is other: return True
-        if other.is_Integer:
-            other = other.as_Fraction
-        if other.is_Fraction:
-            return tuple.__eq__(self, other)
-        return NotImplemented
+        if isinstance(other, Basic):
+            if other.is_Integer:
+                other = other.as_Fraction
+            if other.is_Fraction:
+                return tuple.__eq__(self, other)
+            if other.is_Number:
+                return NotImplemented
+            return False
+        return self == sympify(other)
 
     def __ne__(self, other):
         other = Basic.sympify(other)

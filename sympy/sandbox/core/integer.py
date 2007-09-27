@@ -44,6 +44,8 @@ def integer_nthroot(y, n):
 
 
 pyint = long
+pyint_0 = pyint(0)
+pyint_1 = pyint(1)
 makeinteger = lambda p: pyint.__new__(Integer, p)
 
 class Integer(Rational, pyint):
@@ -53,21 +55,17 @@ class Integer(Rational, pyint):
     @memoizer_immutable_args('Integer.__new__')
     def __new__(cls, p):
         obj = pyint.__new__(cls, p)
-        if p==0:
-            obj.is_zero = True            
-        elif p==1:
-            obj.is_one = True
-        elif p==2:
-            obj.is_two = True
+        obj.is_zero = p==0
+        obj.is_one = p==1
+        obj.p = p
+        obj.q = pyint_1
         return obj
 
     make = staticmethod(makeinteger)
 
     @property
-    def p(self): return pyint(self)
-
-    @property
-    def q(self): return 1
+    def is_two(self):
+        return self==2
 
     # relational methods
 
@@ -78,11 +76,16 @@ class Integer(Rational, pyint):
         return pyint.__cmp__(self, pyint(other))
 
     def __eq__(self, other):
+        if isinstance(other,(int, long)):
+            return pyint(self)==other
         other = Basic.sympify(other)
-        if self is other: return True
         if other.is_Integer:
-            return pyint.__cmp__(self, other)==0
-        return NotImplemented
+            return not pyint.__cmp__(self, other)
+        if other.is_Number:
+            return NotImplemented
+        return False
+
+    __hash__ = pyint.__hash__
 
     def __ne__(self, other):
         other = Basic.sympify(other)
@@ -140,11 +143,11 @@ class Integer(Rational, pyint):
 
     @property
     def is_positive(self):
-        return pyint.__cmp__(self, 0L)==1
+        return pyint.__cmp__(self, pyint_0)==1
 
     @property
     def is_negative(self):
-        return pyint.__cmp__(self, 0L)==-1
+        return pyint.__cmp__(self, pyint_0)==-1
 
     # algorithms
 

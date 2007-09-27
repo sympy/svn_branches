@@ -286,7 +286,7 @@ class MutableCompositeDict(Composite, dict):
 
     def __eq__(self, other):
         other = sympify(other)
-        if self is other: return True
+        #if self is other: return True
         if self.__class__ is not other.__class__: return False
         return dict.__eq__(self, other)
 

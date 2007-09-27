@@ -124,6 +124,13 @@ class Add(ImmutableMeths, MutableAdd):
             self._cached_hash = h
         return h
 
+    def __eq__(self, other):
+        if isinstance(self, Add):
+            return dict.__eq__(self, other)
+        if isinstance(self, Basic):
+            return False
+        return self==sympify(other)
+
     def __getitem__(self, key):
         if isinstance(key, slice) or key.__class__ in [int, long]:
             return self.as_tuple()[key]

@@ -157,14 +157,15 @@ class Mul(ImmutableMeths, MutableMul):
         """
         obj = self
         if hints.get('basic', True):
+            items = self.items()
             if len(self)==1:
-                base, exponent = self.items()[0]
+                base, exponent = items[0]
                 b = base.expand(*args, **hints)
                 e = exponent.expand(*args, **hints)
                 obj = expand_integer_power(b, e)
             elif len(self)==2:
-                b1,e1 = self.items()[0]
-                b2,e2 = self.items()[1]
+                b1,e1 = items[0]
+                b2,e2 = items[1]
                 b1 = b1.expand(*args, **hints)
                 e1 = e1.expand(*args, **hints)
                 b2 = b2.expand(*args, **hints)
@@ -173,13 +174,21 @@ class Mul(ImmutableMeths, MutableMul):
                 p2 = expand_integer_power(b2, e2)
                 obj = expand_mul2(p1, p2)
             else:
-                b1,e1 = self.items()[0]
+                b1,e1 = items[0]
                 b1 = b1.expand(*args, **hints)
                 e1 = e1.expand(*args, **hints)
                 p1 = expand_integer_power(b1,e1)
-                p2 = Mul(*self.items()[1:]).expand(*args, **hints)
+                p2 = Mul(*items[1:]).expand(*args, **hints)
                 obj = expand_mul2(p1, p2)
         return obj
+
+    def __eq__(self, other):
+        if isinstance(other, Mul):
+            return dict.__eq__(self, other)
+        if isinstance(other, Basic):
+            return False
+        return self==sympify(other)
+
 
 class Pow(Basic):
     """
@@ -244,7 +253,6 @@ def expand_integer_power_miller(x, m):
     ##  a(m,k) = 1/(k p_0) sum_{i=1}^n p_i ((m+1)i-k) a(m,k-i),
     ## where a(m,0) = p_0^m.
     Fraction = Basic.Fraction
-    MutableAdd = Basic.MutableAdd
     Add = Basic.Add
     m = int(m)
     xt = x.items()
@@ -257,10 +265,9 @@ def expand_integer_power_miller(x, m):
         l1 = []
         for i in xrange(1,n+1):
             if i<=k:
-                lk = l[k-i]
-                p0i = p0[i]
                 f = Fraction((m+1)*i-k,k)
-                p0if = p0i*f
+                p0if = p0[i]*f
+                lk = l[k-i]                
                 if lk.is_Add:
                     for t,c in lk.items():
                         l1.append((t*p0if,c))
