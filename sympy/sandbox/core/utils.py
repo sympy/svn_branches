@@ -37,14 +37,13 @@ def memoizer_immutable_args(name):
         func._cache_it_cache = func_cache_it_cache = {}
         def wrapper(*args):
             try:
-                return func_cache_it_cache[args]
-            except KeyError:
-                pass
+                r = func_cache_it_cache.get(args, None)
             except TypeError, msg:
                 if 'dict objects are unhashable'==str(msg):
                     return func(*args)
                 raise
-            func_cache_it_cache[args] = r = func(*args)
+            if r is None:
+                func_cache_it_cache[args] = r = func(*args)
             return r
         all_caches[name] = func_cache_it_cache
         wrapper.__name__ = 'wrapper.%s' % (name)
@@ -56,11 +55,9 @@ def memoizer_Symbol_new(func):
     def wrapper(cls, name, dummy=False, **options):
         if dummy:
             return func(cls, name, dummy=dummy, **options)
-        try:
-            return func_cache_it_cache[name]
-        except KeyError:
-            pass
-        func_cache_it_cache[name] = r = func(cls, name, dummy=dummy, **options)
+        r = func_cache_it_cache.get(name, None)
+        if r is None:
+            func_cache_it_cache[name] = r = func(cls, name, dummy=dummy, **options)
         return r
     all_caches['Symbol.__new__'] = func_cache_it_cache
     wrapper.__name__ = 'wrapper.Symbol.__new__'
