@@ -41,13 +41,7 @@ class Symbol(ArithMeths, Atom, str):
             return cmp(id(self), id(other))
         return cmp(str(self), str(other))
 
-    def __eq__(self, other):
-        try:
-            if not other.is_Symbol:
-                return False
-            return str.__eq__(self, other)
-        except AttributeError:
-            return self.__eq__(sympify(other))
+    __eq__ = str.__eq__
 
     def __call__(self, *args):
         signature = Basic.FunctionSignature((Basic,)*len(args), (Basic,))
