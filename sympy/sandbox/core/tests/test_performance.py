@@ -90,7 +90,29 @@ def xtest_sum_performance():
     #d3 = t2-t1
     #print '\ntiming summation: sandbox.core(direct/MutableAdd) %s/%s secs, sympy.core %s secs' % (d1,d2,d3)
 
+def test_expand_performance():
+    from time import clock
+    from sympy.sandbox.core import sympify
+    expr = '(x+z+y)**20 * (z+x)**9'
+    e = sympify(expr)
+    t1 = clock()
+    e = e.expand()
+    t2 = clock()
+    d1 = t2-t1
+
+    d2 = None
+    if 0:
+        from sympy import sympify
+        expr = '(x+z+y)**10 * (z+x)**9'
+        e = sympify(expr)
+        t1 = clock()
+        e = e.expand()
+        t2 = clock()
+        d2 = t2-t1
+    print '\ntiming %r expand: sandbox.core %s secs, sympy.core %s secs' % (expr, d1, d2)
+
 if __name__=='__main__':
-    test_mul_performance()
-    test_add_performance()
-    test_sum_performance()
+    #test_mul_performance()
+    #test_add_performance()
+    #test_sum_performance()
+    test_expand_performance()

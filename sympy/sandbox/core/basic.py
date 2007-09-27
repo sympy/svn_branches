@@ -15,6 +15,8 @@ ordering_of_classes = [
     'Equality','Unequality','StrictInequality','Inequality',
     ]
 
+
+
 class BasicType(type):
 
     classnamespace = dict()
@@ -34,8 +36,8 @@ class BasicType(type):
         type.__init__(cls, *args, **kws)
 
     def __getattr__(cls, name):
-        try: return BasicType.classnamespace[name]
-        except KeyError: pass
+        r = BasicType.classnamespace.get(name, None)
+        if r is not None: return r
         raise AttributeError("'%s' object has no attribute '%s'"%
                              (cls.__name__, name))
 
@@ -115,8 +117,8 @@ class Basic(object):
 
         if isinstance(a, Basic):
             return a
-        if isinstance(a, bool):
-            raise NotImplementedError("bool support")
+        #if isinstance(a, bool):
+        #    raise NotImplementedError("bool support")
         if isinstance(a, (int, long)):
             return Basic.Integer(a)
         if isinstance(a, float):
@@ -289,21 +291,6 @@ class MutableCompositeDict(Composite, dict):
         #if self is other: return True
         if self.__class__ is not other.__class__: return False
         return dict.__eq__(self, other)
-
-    def as_tuple(self):
-        """
-        Use only when self is immutable.
-        """
-        try:
-            return self.__dict__['_cached_as_tuple']
-        except KeyError:
-            pass
-        assert self.is_immutable,\
-               '%s.as_tuple() can only be used if instance is immutable' \
-               % (self.__class__.__name__)
-        r = tuple(sorted(self.items()))
-        self._cached_as_tuple = r
-        return r
 
     def subs(self, old, new):
         old = sympify(old)

@@ -43,17 +43,18 @@ class MutableMul(ArithMeths, MutableCompositeDict):
                 #        (a**z)**w where z,w are complex numbers
                 self.update(k, v * p)
             return
-        try:
-            self[a] += p
-        except KeyError:
+        b = self.get(a,None)
+        if b is None:
             self[a] = sympify(p)
+        else:
+            self[a] = b + p
 
     def canonical(self):
         # self will be modified in-place,
         # always return an immutable object
         n = Basic.one
         for k,v in self.items():
-            if v==0:
+            if v.is_zero:
                 # Mul({a:0}) -> 1
                 del self[k]
                 continue
@@ -62,9 +63,9 @@ class MutableMul(ArithMeths, MutableCompositeDict):
                 continue
             if a.is_Number:
                 del self[k]
-                n *= a
+                n = n * a
             else:
-                if a==k and v==1: continue
+                if a==k and v.is_one: continue
                 del self[k]
                 self.update(a)
                 return self.canonical()
@@ -82,9 +83,7 @@ class MutableMul(ArithMeths, MutableCompositeDict):
                 obj = k
         if n.is_one:
             return obj
-        s = Basic.MutableAdd()
-        s.update(obj, n)
-        return s.canonical()
+        return Basic.Add((obj,n))
 
     # arithmetics methods
     def __imul__(self, other):
@@ -113,16 +112,24 @@ class Mul(ImmutableMeths, MutableMul):
 
     # object identity methods
     def __hash__(self):
-        try:
-            return self.__dict__['_cached_hash']
-        except KeyError:
-            h = hash((self.__class__.__name__,)+ self.as_tuple())
+        h = self.__dict__.get('_cached_hash', None)
+        if h is None:
+            h = hash((Mul,)+ self.as_tuple())
             self._cached_hash = h
         return h
+
+    def as_tuple(self):
+        r = self.__dict__.get('_cached_as_tuple', None)
+        if r is None:
+            l = self.items()
+            l.sort()
+            r = tuple(l)
+            self._cached_as_tuple = r
+        return r
     
     def __getitem__(self, key):
         if isinstance(key, slice) or key.__class__ in [int, long]:
-            return self.as_tuple()[key]
+            return self.items()[key]
         return dict.__getitem__(self, key)
 
     def canonical(self):
@@ -223,14 +230,12 @@ def expand_mul2(x, y):
     target must be None or MutableAdd instance.
     """
     if x.is_Add and y.is_Add:
-        sums = Basic.MutableAdd()
         yt = y.items()
-        for (t1,c1) in x.items():
-            for (t2,c2) in yt:
-                sums.update(t1*t2,c1*c2)
-        return sums.canonical()
+        xt = x.items()
+        return Basic.Add(*[(t1*t2,c1*c2) for (t1,c1) in xt for (t2,c2) in yt])
     if x.is_Add:
-        return Basic.Add(*[(t1*y,c1) for (t1,c1) in x.items()])
+        xt = x.items()
+        return Basic.Add(*[(t1*y,c1) for (t1,c1) in xt])
     if y.is_Add:
         return expand_mul2(y, x)
     return x * y
@@ -267,10 +272,9 @@ def expand_integer_power_miller(x, m):
             if i<=k:
                 f = Fraction((m+1)*i-k,k)
                 p0if = p0[i]*f
-                lk = l[k-i]                
+                lk = l[k-i]
                 if lk.is_Add:
-                    for t,c in lk.items():
-                        l1.append((t*p0if,c))
+                    l1.extend([(t*p0if,c) for (t,c) in lk.items()])
                 else:
                     l1.append(lk*p0if)
         a = Add(*l1)

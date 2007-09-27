@@ -61,10 +61,11 @@ class MutableAdd(ArithMeths, MutableCompositeDict):
         if a.is_Number:
             p = a * p
             a = Basic.one
-        try:
-            self[a] = self[a] + p
-        except KeyError:
+        b = self.get(a,None)
+        if b is None:
             self[a] = sympify(p)
+        else:
+            self[a] = b + p
         return
 
     def canonical(self):
@@ -117,12 +118,20 @@ class Add(ImmutableMeths, MutableAdd):
 
     # object identity methods
     def __hash__(self):
-        try:
-            return self.__dict__['_cached_hash']
-        except KeyError:
-            h = hash((self.__class__.__name__,)+ self.as_tuple())
+        h = self.__dict__.get('_cached_hash', None)
+        if h is None:
+            h = hash((Add,)+ self.as_tuple())
             self._cached_hash = h
         return h
+
+    def as_tuple(self):
+        r = self.__dict__.get('_cached_as_tuple', None)
+        if r is None:
+            l = self.items()
+            l.sort()
+            r = tuple(l)
+            self._cached_as_tuple = r
+        return r
 
     def __eq__(self, other):
         if isinstance(self, Add):
@@ -133,7 +142,7 @@ class Add(ImmutableMeths, MutableAdd):
 
     def __getitem__(self, key):
         if isinstance(key, slice) or key.__class__ in [int, long]:
-            return self.as_tuple()[key]
+            return self.items()[key]
         return dict.__getitem__(self, key)
 
     def split(self, op, *args, **kwargs):
