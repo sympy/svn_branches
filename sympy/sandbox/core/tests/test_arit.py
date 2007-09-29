@@ -111,8 +111,8 @@ def testpow():
     assert e == Rational(0)
     e=n*a*b+n*b*a
     assert e == 2*a*b*5**(Rational(1)/2)
-    #assert e.diff(a) == 2*b*5**(Rational(1)/2)
-    #assert e.diff(a) == 2*b*5**(Rational(1)/2)
+    assert e.diff(a) == 2*b*5**(Rational(1)/2)
+    assert e.diff(a) == 2*b*5**(Rational(1)/2)
     e=a/b**2
     assert e == a*b**(-2)
 

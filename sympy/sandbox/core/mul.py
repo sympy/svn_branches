@@ -196,6 +196,27 @@ class Mul(ImmutableMeths, MutableMul):
             return False
         return self==sympify(other)
 
+    def try_derivative(self, s):
+        terms = self.items()
+        factors = []
+        for i in xrange(len(terms)):
+            b,e = terms[i]
+            dbase = b.diff(s)
+            dexp = e.diff(s)
+            if dexp.is_zero:
+                dt = b**(e-1) * dbase * e
+            else:
+                dt = b**e * (dexp * Basic.log(b) + dbase * e/b)
+            if dt.is_zero:
+                continue
+            factors.append(Mul(*(terms[:i]+[dt]+terms[i+1:])))
+        return Basic.Add(*factors)
+
+    def __call__(self, *args):
+        """
+        (f**n * g**m)(x) -> f(x)**n * g(x)**m
+        """
+        return Mul(*[(t(*args), e) for (t,e) in self.items()])
 
 class Pow(Basic):
     """

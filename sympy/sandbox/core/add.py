@@ -184,3 +184,12 @@ class Add(ImmutableMeths, MutableAdd):
         if hints.get('basic', True):
             obj = Add(*[(t.expand(*args, **hints), e) for (t,e) in self.items()])
         return obj
+
+    def try_derivative(self, s):
+        return Add(*[(t.diff(s), e) for (t,e) in self.items()])
+
+    def __call__(self, *args):
+        """
+        (2*a + 3*sin)(x) -> 2*a(x) + 3*sin(x)
+        """
+        return Add(*[(t(*args), e) for (t,e) in self.items()])

@@ -6,16 +6,59 @@ class dualmethod(object):
     Enable calling a method as a class method or as an instance method
     provided that both metaclass and class define methods with the
     same name.
+
+    Consider the following example:
+
+    class AType(type):
+        def foo(cls):
+            print 'In AType.foo()'
+
+    class A(object):
+        __metaclass__ = AType
+        def foo(self):
+            print 'In A.foo()'
+
+    The objective is to be able to call foo method both as
+    `A.foo()` and `A().foo()`. Using the example above,
+    a TypeError is raised when calling `A.foo()`:
+
+    >>> A().foo()
+    In A.foo()
+    >>> A.foo()
+    ...
+    <type 'exceptions.TypeError'>: unbound method foo() must be called with A instance as first argument (got nothing instead)
+
+    This issue can be overcome by adding dualmethod decorator to
+    A.foo method definition:
+
+    class A(object):
+        __metaclass__ = AType
+        @dualmethod
+        def foo(self):
+            print 'In A.foo()'
+
+    And now the example works as expected:
+
+    >>> A().foo()
+    In A.foo()
+    >>> A.foo()
+    In AType.foo()
+
     """
     # got the idea from http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/523033
     
-    def __init__(self, func):
-        self.func = func
-        self.method_name = func.__name__
-        self.class_wrapper_name = '%s.%s(<type>) wrapper' \
-                                  % (type.__name__, self.func.__name__)
-        self.instance_wrapper_name = '%s.%s(<instance>) wrapper' \
-                                     % (type.__name__, self.func.__name__)
+    def __new__(cls, func):
+        obj = getattr(func, '_dualmethod', None)
+        if obj is not None:
+            return obj
+        obj = object.__new__(cls)
+        obj.func = func
+        obj.method_name = func.__name__
+        obj.class_wrapper_name = '%s.%s(<type>) wrapper' \
+                                 % (type.__name__, func.__name__)
+        obj.instance_wrapper_name = '%s.%s(<instance>) wrapper' \
+                                    % (type.__name__, func.__name__)
+        return obj
         
     def __get__(self, obj, typ=None):
         if obj is None:
@@ -23,13 +66,49 @@ class dualmethod(object):
                 return getattr(typ.__class__,
                                self.method_name)(typ, *args, **kw)
             class_wrapper.__name__ = self.class_wrapper_name
+            class_wrapper._dualmethod = self
             return class_wrapper
         else:
             def instance_wrapper(*args, **kw):
                 return self.func(obj, *args, **kw)
             instance_wrapper.__name__ = self.instance_wrapper_name
+            instance_wrapper._dualmethod = self
             return instance_wrapper
 
+class dualproperty(object):
+    """ dualproperty decorator.
+
+class AType(type):
+    @property
+    def foo(cls):
+        return 'AType.foo'
+
+class A(object):
+    __metaclass__ = AType
+    @dualproperty
+    def foo(self):
+        return 'A.foo'
+
+A.foo -> 'AType.foo'
+A().foo -> 'A.foo'
+
+See also dualmethod.
+    """
+    def __new__(cls, func, type_callback=None):
+        obj = object.__new__(cls)
+        obj.func = func
+        obj.attr_name = func.__name__
+        obj.type_callback = type_callback
+        return obj
+        
+    def __get__(self, obj, typ=None):
+        if obj is None:
+            if self.type_callback is not None:
+                return self.type_callback(typ)
+            r = getattr(typ.__base__, self.attr_name)
+            return r
+        else:
+            return self.func(obj)
 
 def memoizer_immutable_args(name):
     def make_memoized(func):

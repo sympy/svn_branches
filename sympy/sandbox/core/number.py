@@ -74,6 +74,16 @@ class Number(NumberMeths, Atom):
                 return r
         return
 
+    def try_derivative(self, s):
+        return Basic.zero
+
+    def __call__(self, *args):
+        """ Number as a constant function.
+        (n)(x) -> n
+        """
+        return self
+
+
 class Real(Number):
 
     """

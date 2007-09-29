@@ -1,6 +1,6 @@
 
 from parser import Expr
-from utils import memoizer_immutable_args
+from utils import memoizer_immutable_args, dualproperty
 
 ordering_of_classes = [
     'int','long',
@@ -15,31 +15,29 @@ ordering_of_classes = [
     'Equality','Unequality','StrictInequality','Inequality',
     ]
 
-
-
 class BasicType(type):
 
-    classnamespace = dict()
-    def __init__(cls,*args,**kws):
-        if not cls.undefined_Function:
-            # make Basic subclasses available as attributes
-            # set is_<classname> = True and False for other classes
-            n = cls.__name__
-            c = BasicType.classnamespace.get(n)
-            if c is None:
-                setattr(cls, 'is_' + n, True)
-                for k, v in BasicType.classnamespace.items():
-                    setattr(v, 'is_' + n, False)
-                BasicType.classnamespace[n] = cls
-            else:
-                print 'Ignoring redefinition of %s: %s defined earlier than %s' % (n, c, cls)
-        type.__init__(cls, *args, **kws)
+    def __new__(typ, name, bases, attrdict):
 
-    def __getattr__(cls, name):
-        r = BasicType.classnamespace.get(name, None)
-        if r is not None: return r
-        raise AttributeError("'%s' object has no attribute '%s'"%
-                             (cls.__name__, name))
+        # set obj.is_Class attributes such that
+        #   isinstance(obj, Class)==obj.is_Class
+        # holds:
+        if name=='Basic':
+            attrdict['is_Basic'] = property(lambda self: True)
+        else:
+            attrdict['is_'+name] = dualproperty(lambda self:True)
+            setattr(Basic, 'is_' + name,
+                    dualproperty(lambda self:False,
+                                 lambda cls:isinstance(cls, getattr(Basic, name))))
+            
+        # create Class:
+        cls = type.__new__(typ, name, bases, attrdict)
+
+        # set Basic.Class attributes:
+        if name!='Basic':
+            setattr(Basic, cls.__name__, cls)
+
+        return cls
 
     def __cmp__(cls, other):
         if cls is other: return 0
@@ -63,7 +61,6 @@ class BasicType(type):
         if i1 == unknown and i2 == unknown:
             return cmp(n1, n2)
         return cmp(i1,i2)
-
 
 class Basic(object):
 
@@ -196,12 +193,99 @@ class Basic(object):
             return new
         return self
 
+    def atoms(self, type=None):
+        """Returns the atoms that form current object.
+
+        Example:
+        >>> from sympy import *
+        >>> x = Symbol('x')
+        >>> y = Symbol('y')
+        >>> (x+y**2+ 2*x*y).atoms()
+        set([2, x, y])
+
+        You can also filter the results by a given type(s) of object
+        >>> (x+y+2+y**2*sin(x)).atoms(type=Symbol)
+        set([x, y])
+
+        >>> (x+y+2+y**2*sin(x)).atoms(type=Number)
+        set([2])
+
+        >>> (x+y+2+y**2*sin(x)).atoms(type=(Symbol, Number))
+        set([2, x, y])
+        """
+        result = set()
+        if type is not None and not isinstance(type, (object.__class__, tuple)):
+            type = Basic.sympify(type).__class__
+        if self.is_Atom:
+            if type is None or isinstance(self, type):
+                result.add(self)
+        elif isinstance(self, dict):
+            for k,c in self.items():
+                result = result.union(k.atoms(type=type))
+                result = result.union(c.atoms(type=type))
+        else:
+            for obj in self:
+                result = result.union(obj.atoms(type=type))
+        return result
+
     def expand(self, *args, **hints):
         """Expand an expression based on different hints. Currently
            supported hints are basic, power, complex, trig and func.
         """
         return self
 
+    def has(self, *patterns):
+        """
+        Return True if self has any of the patterns.
+        """
+        if len(patterns)>1:
+            for p in patterns:
+                if self.has(p):
+                    return True
+            return False
+        elif not patterns:
+            raise TypeError("has() requires at least 1 argument (got none)")
+        p = Basic.sympify(patterns[0])
+        if not p.is_Wild:
+            return p in self.atoms(p.__class__)
+        raise NotImplementedError('has: wild support')
+
+    def diff(self, *symbols):
+        new_symbols = []
+        for s in symbols:
+            s = Basic.sympify(s)
+            if s.is_Integer and new_symbols:
+                last_s = new_symbols.pop()
+                new_symbols += [last_s] * int(s)
+            elif s.is_Symbol:
+                new_symbols.append(s)
+            else:
+                raise TypeError(".diff() argument must be Symbol|Integer instance (got %s)"\
+                                % (s.__class__.__name__))
+        expr = self
+        unused_symbols = []
+        for s in new_symbols:
+            obj = expr.try_derivative(s)
+            if obj is not None:
+                expr = obj
+            else:
+                unused_symbols.append(s)
+        if not unused_symbols:
+            return expr
+        for s in unused_symbols:
+            if not expr.has(s):
+                return Basic.zero
+        return Basic.Derivative(self, *new_symbols)
+
+    def try_derivative(self, s):
+        raise NotImplementedError('%s.try_derivative' % (self.__class__.__name__))
+        return
+
+    def split(self, op, *args, **kwargs):
+        return [self]
+
+    def is_callable(self):
+        return False
 
 class Atom(Basic):
 
@@ -313,6 +397,7 @@ class MutableCompositeDict(Composite, dict):
                 r.update(term, coeff)
             return r.canonical()
         return self
+
 
 sympify = Basic.sympify
 Expr.register_handler(Basic)

@@ -1,6 +1,6 @@
 
 import types
-from utils import dualmethod
+from utils import dualmethod, dualproperty
 from basic import Atom, Composite, Basic, BasicType, sympify
 from methods import ArithMeths
 
@@ -54,7 +54,6 @@ class FunctionSignature:
                                self.argument_classes,
                                self.value_classes)
 
-
 Basic.FunctionSignature = FunctionSignature
 
 class FunctionClass(ArithMeths, Atom, BasicType):
@@ -65,40 +64,71 @@ class FunctionClass(ArithMeths, Atom, BasicType):
     undefined function classes.
 
     """
-    def __new__(cls, arg1, arg2, arg3=None, **options):
-        assert not options,`options`
-        if isinstance(arg1, type):
-            ftype, name, signature = arg1, arg2, arg3
-            assert ftype.__name__.endswith('Function'),`ftype`
-            attrdict = ftype.__dict__.copy()
-            attrdict['undefined_Function'] = True
-            if signature is not None:
+
+    def __new__(typ, *args, **kws):
+        if isinstance(args[0], type):
+            # create a class of undefined function
+            if len(args)==2:
+                ftype, name = args
+                attrdict = ftype.__dict__.copy()
+            else:
+                ftype, name, signature = args
+                attrdict = ftype.__dict__.copy()
                 attrdict['signature'] = signature
+            assert ftype is UndefinedFunction,`ftype`
             bases = (ftype,)
-            cls.set_methods_as_dual(name, attrdict)
-            func = type.__new__(cls, name, bases, attrdict)
+            #typ.set_methods_as_dual(name, attrdict)
+            func = type.__new__(typ, name, bases, attrdict)
         else:
-            name, bases, attrdict = arg1, arg2, arg3
-            func = type.__new__(cls, name, bases, attrdict)
-            cls.set_methods_as_dual(name, func.__dict__)
+            # defined functions
+            name, bases, attrdict = args
+
+            attrdict['is_undefined_Function'] = False
+            
+            attrdict['is_'+name] = dualproperty(lambda self:True)
+            setattr(Basic, 'is_' + name,
+                    property(lambda self:False,
+                             lambda cls:isinstance(cls, getattr(Basic, name))))
+            
+            func = type.__new__(typ, name, bases, attrdict)
+
+            typ._set_methods_as_dual(func, attrdict)
+
+            # predefined objest is used by parser
             Basic.predefined_objects[name] = func
+
+            # set Basic.Class attributes:
+            setattr(Basic, func.__name__, func)
+            
         return func
 
     @classmethod
-    def set_methods_as_dual(cls, name, attrdict):
-        for k in attrdict.keys():
-            if k in ['__new__', '__init__']:
+    def _set_methods_as_dual(cls, func, attrdict):
+        name = func.__name__
+        methods = []
+        names = []
+        for n in attrdict.keys():
+            if n in ['__new__', '__init__']:
                 continue
-            mth = attrdict[k]
-            if isinstance(mth, types.FunctionType) and hasattr(cls,k):
-                # be verbose for a while:
-                print 'making',name,'method dual:', mth
-                attrdict[k] = dualmethod(mth)
-            elif isinstance(mth, types.UnboundMethodType):
-                print k,mth
+            mth = attrdict[n]
+            if isinstance(mth, types.FunctionType) and cls.__dict__.has_key(n):
+                methods.append((n, mth))
+                names.append(n)
+        for c in func.__bases__:
+            for n in getattr(c,'_dualmethod_names',[]):
+                if n not in names:
+                    mth = getattr(c, n)
+                    methods.append((n, mth))
+                    names.append(n)
+        for (n,mth) in methods:
+            # being verbose for a while:
+            print 'applying dualmethod to %s.%s' % (name, n)
+            setattr(func, n, dualmethod(mth))
+        func._dualmethod_names = names
+        return
 
     def torepr(cls):
-        if cls.undefined_Function:
+        if cls.is_undefined_Function:
             for b in cls.__bases__:
                 if b.__name__.endswith('Function'):
                     return "%s('%s')" % (b.__name__, cls.__name__)
@@ -111,10 +141,31 @@ class FunctionClass(ArithMeths, Atom, BasicType):
     def get_precedence(cls):
         return Basic.Atom_precedence
 
+    @property
+    def precedence(cls):
+        return Basic.Atom_precedence
+
+    #precedence = Basic.Atom_precedence
+
     def try_power(cls, exponent):
         return
 
-class Function(Composite, tuple):
+    def split(cls, op, *args, **kwargs):
+        return [cls]
+
+    def fdiff(cls, index=0):
+        raise NotImplementedError('%s.fdiff' % (cls.__name__))
+
+    def atoms(cls, type=None):
+        if type is not None and not isinstance(type, (object.__class__, tuple)):
+            type = Basic.sympify(type).__class__
+        if type is None or isinstance(cls, type):
+            return set([cls])
+        return set()
+
+Basic.FunctionClass = FunctionClass
+
+class Function(ArithMeths, Composite, tuple):
     """
     Base class for applied functions.
     Constructor of undefined classes.
@@ -133,16 +184,18 @@ class Function(Composite, tuple):
             if cls is Function and len(args)==1:
                 # Default function signature is of SingleValuedFunction
                 # that provides basic arithmetic methods.
-                cls = SingleValuedFunction
-            return FunctionClass(cls, *args, **options)
-        args = map(Basic.sympify, args)
+                cls = UndefinedFunction
+            return FunctionClass(cls, *args)
+        args = map(sympify, args)
         cls.signature.validate(args)
         r = cls.canonize(args, **options)
-        if isinstance(r, Basic): return r
+        if isinstance(r, Basic):
+            return r
         elif r is None:
             pass
         elif not isinstance(r, tuple):
             args = (r,)
+        # else we have multiple valued function
         return tuple.__new__(cls, args)
 
     def __hash__(self):
@@ -163,6 +216,10 @@ class Function(Composite, tuple):
     @property
     def args(self):
         return tuple(self)
+
+    @property
+    def func(self):
+        return self.__class__
         
     @classmethod
     def canonize(cls, args, **options):
@@ -181,6 +238,10 @@ class Function(Composite, tuple):
         return r
 
     def get_precedence(self):
+        return Basic.Apply_precedence
+
+    @dualproperty
+    def precedence(cls):
         return Basic.Apply_precedence
 
     def subs(self, old, new):
@@ -206,15 +267,45 @@ class Function(Composite, tuple):
             return func(*args)
         return self
 
-    def try_power(self, exponent):
+    def split(cls, op, *args, **kwargs):
+        return [cls]
+
+    def try_power(cls, exponent):
         return
 
-class SingleValuedFunction(ArithMeths, Function):
+    def atoms(self, type=None):
+        return Basic.atoms(self, type).union(self.__class__.atoms(type))
+
+    def __call__(self, *args):
+        """
+        (f(g))(x) -> f(g(x))
+        (f(g1,g2))(x) -> f(g1(x), g2(x))
+        """
+        return self.__class__(*[a(*args) for a in self.args])
+
+class UndefinedFunction(Function):
+
+    signature = FunctionSignature(None, (Basic,))
+
+class SingleValuedFunction(Function):
     """
     Single-valued functions.
     """
     signature = FunctionSignature(None, (Basic,))
 
+    def try_derivative(self, s):
+        i = 0
+        l = []
+        r = Basic.zero
+        args = self.args
+        for a in args:
+            i += 1
+            da = a.diff(s)
+            if da.is_zero:
+                continue
+            df = self.func.fdiff(i)
+            l.append(df(*args) * da)
+        return Basic.Add(*l)
 
 class Lambda(FunctionClass):
 

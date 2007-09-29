@@ -13,10 +13,11 @@ class sin(SingleValuedFunction):
 
     @classmethod
     def canonize(cls, (arg,), **options):
-        #if arg == nan:
-        #    return nan
-        if arg == 0:
-            return Integer(0)
+        if arg.is_NaN: return arg
+        if arg.is_Number:
+            if arg.is_zero: return arg
+            if arg.is_negative: return -cls(-arg)
+            return
         factors = arg.split('*')
         if I in factors:
             # Simplify sin(I*x)
@@ -31,4 +32,98 @@ class sin(SingleValuedFunction):
                     return (-1)**((c.p//c.q)%2) * cases[c.q]
         if any(x.is_Rational and x.p < 0 for x in factors):
             return -sin(-arg)
+        return
 
+    @classmethod
+    def fdiff(cls, index=1):
+        if index!=1:
+            raise ValueError('%s takes 1 argument, reguested %sth' % (cls.__name__, index))
+        return cos
+
+class cos(SingleValuedFunction):
+
+    signature = FunctionSignature((Basic,), (Basic,))
+
+    @classmethod
+    def canonize(cls, (arg,), **options):
+        if arg.is_NaN: return arg
+        if arg.is_Number:
+            if arg.is_zero: return Basic.one
+            if arg.is_negative: return cls(-arg)
+            return
+
+    @classmethod
+    def fdiff(cls, index=1):
+        if index!=1:
+            raise ValueError('%s takes 1 argument, reguested %sth' % (cls.__name__, index))
+        return -sin
+
+class exp(SingleValuedFunction):
+
+    signature = FunctionSignature((Basic,), (Basic,))
+
+    @classmethod
+    def canonize(cls, (arg,), **options):
+        if arg.is_NaN: return arg
+        if arg.is_Number:
+            if arg.is_zero: return Basic.one
+            return
+
+    @classmethod
+    def fdiff(cls, index=1):
+        if index!=1:
+            raise ValueError('%s takes 1 argument, reguested %sth' % (cls.__name__, index))
+        return cls
+
+class log(SingleValuedFunction):
+
+    signature = FunctionSignature((Basic,), (Basic,))
+
+    @classmethod
+    def canonize(cls, (arg,), **options):
+        if arg.is_NaN: return arg
+        if arg.is_Number:
+            if arg.is_one: return Basic.zero
+            return
+
+    @classmethod
+    def fdiff(cls, index=1):
+        if index!=1:
+            raise ValueError('%s takes 1 argument, reguested %sth' % (cls.__name__, index))
+        x = Basic.Symbol('x',dummy=True)
+        return Basic.Lambda(x,1/x)
+
+class tan(SingleValuedFunction):
+
+    signature = FunctionSignature((Basic,), (Basic,))
+
+    @classmethod
+    def canonize(cls, (arg,), **options):
+        if arg.is_NaN: return arg
+        if arg.is_Number:
+            if arg.is_zero: return arg
+            if arg.is_negative: return -cls(-arg)
+
+
+    @classmethod
+    def fdiff(cls, index=1):
+        if index!=1:
+            raise ValueError('%s takes 1 argument, reguested %sth' % (cls.__name__, index))
+        return cls**2 + 1
+
+class cot(SingleValuedFunction):
+
+    signature = FunctionSignature((Basic,), (Basic,))
+
+    @classmethod
+    def canonize(cls, (arg,), **options):
+        if arg.is_NaN: return arg
+        if arg.is_Number:
+            pass
+
+
+    @classmethod
+    def fdiff(cls, index=1):
+        if index!=1:
+            raise ValueError('%s takes 1 argument, reguested %sth' % (cls.__name__, index))
+        return -1/sin**2
