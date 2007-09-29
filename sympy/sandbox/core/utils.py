@@ -1,6 +1,90 @@
 all_caches = {}
 
-class dualmethod(object):
+class Decorator(object):
+    pass
+
+class FDiffMethod(Decorator):
+    ''' FDiffMethod decorator
+
+    FDiffMethod behaves like a class method but when called
+    as instance method, the call is replaced with instance.instance_fdiff
+    method call.
+    '''
+
+    def __new__(cls, func, clsname=None):
+        if isinstance(func, cls):
+            return func
+        obj = object.__new__(cls)
+        obj.func = func
+        if clsname is None:
+            obj.class_wrapper_name = '%s(%s) class method wrapper' \
+                                     % (cls.__name__, func.__name__)
+            obj.instance_wrapper_name = '%s(%s) instance method wrapper' \
+                                        % (cls.__name__, func.__name__)
+        else:
+            obj.class_wrapper_name = '%s(%s.%s) class method wrapper' \
+                                     % (cls.__name__, clsname, func.__name__)
+            obj.instance_wrapper_name = '%s(%s.%s) instance method wrapper' \
+                                        % (cls.__name__, clsname, func.__name__)
+        return obj
+        
+    def __get__(self, obj, typ=None):
+        if obj is None:
+            def class_wrapper(*args, **kw):
+                return self.func(typ, *args, **kw)
+            class_wrapper.__name__ = self.class_wrapper_name
+            return class_wrapper
+        else:
+            def instance_wrapper(*args, **kw):
+                return getattr(obj, 'instance_fdiff')(*args)
+            instance_wrapper.__name__ = self.instance_wrapper_name
+            return instance_wrapper    
+
+class UniversalMethod(Decorator):
+    ''' universalmethod decorator
+
+class AType(type):
+    pass
+
+class A(object):    
+    __metaclass__ = AType
+    @UniversalMethod
+    def foo(self_or_cls):
+        return 'A.foo(%r)' % (self_or_cls)
+
+A.foo() -> "A.foo(<class \'__main__.A\'>)"
+A().foo() -> "A.foo(<__main__.A object at 0xfdb3d0>)"
+    '''
+
+
+    def __new__(cls, func):
+        if isinstance(func, cls):
+            return func
+        obj = object.__new__(cls)
+        obj.func = func
+        obj.method_name = func.__name__
+        obj.class_wrapper_name = '%s(%s) class method wrapper' \
+                                 % (cls.__name__, func.__name__)
+        obj.instance_wrapper_name = '%s(%s) instance method wrapper' \
+                                        % (cls.__name__, func.__name__)
+        return obj
+        
+    def __get__(self, obj, typ=None):
+        if obj is None:
+            def class_wrapper(*args, **kw):
+                return self.func(typ, *args, **kw)
+            class_wrapper.__name__ = self.class_wrapper_name
+            class_wrapper._universalmethod = self
+            return class_wrapper
+        else:
+            def instance_wrapper(*args, **kw):
+                return self.func(obj, *args, **kw)
+            instance_wrapper.__name__ = self.instance_wrapper_name
+            instance_wrapper._universalmethod = self
+            return instance_wrapper    
+
+
+class DualMethod(Decorator):
     """dualmethod decorator.
     
     Enable calling a method as a class method or as an instance method
@@ -28,12 +112,12 @@ class dualmethod(object):
     ...
     <type 'exceptions.TypeError'>: unbound method foo() must be called with A instance as first argument (got nothing instead)
 
-    This issue can be overcome by adding dualmethod decorator to
+    This issue can be overcome by adding DualMethod decorator to
     A.foo method definition:
 
     class A(object):
         __metaclass__ = AType
-        @dualmethod
+        @DualMethod
         def foo(self):
             print 'In A.foo()'
 
@@ -47,35 +131,37 @@ class dualmethod(object):
     """
     # got the idea from http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/523033
     
-    def __new__(cls, func):
-        obj = getattr(func, '_dualmethod', None)
-        if obj is not None:
-            return obj
+    def __new__(cls, func, clsname=None):
+        if isinstance(func, cls):
+            return func
         obj = object.__new__(cls)
         obj.func = func
-        obj.method_name = func.__name__
-        obj.class_wrapper_name = '%s.%s(<type>) wrapper' \
-                                 % (type.__name__, func.__name__)
-        obj.instance_wrapper_name = '%s.%s(<instance>) wrapper' \
-                                    % (type.__name__, func.__name__)
+        if clsname is None:
+            obj.class_wrapper_name = '%s(%s) class method wrapper' \
+                                     % (cls.__name__, func.__name__)
+            obj.instance_wrapper_name = '%s(%s) instance method wrapper' \
+                                        % (cls.__name__, func.__name__)
+        else:
+            obj.class_wrapper_name = '%s(%s.%s) class method wrapper' \
+                                     % (cls.__name__, clsname, func.__name__)
+            obj.instance_wrapper_name = '%s(%s.%s) instance method wrapper' \
+                                        % (cls.__name__, clsname, func.__name__)
         return obj
         
     def __get__(self, obj, typ=None):
         if obj is None:
             def class_wrapper(*args, **kw):
                 return getattr(typ.__class__,
-                               self.method_name)(typ, *args, **kw)
+                               self.func.__name__)(typ, *args, **kw)
             class_wrapper.__name__ = self.class_wrapper_name
-            class_wrapper._dualmethod = self
             return class_wrapper
         else:
             def instance_wrapper(*args, **kw):
                 return self.func(obj, *args, **kw)
             instance_wrapper.__name__ = self.instance_wrapper_name
-            instance_wrapper._dualmethod = self
             return instance_wrapper
 
-class dualproperty(object):
+class DualProperty(Decorator):
     """ dualproperty decorator.
 
 class AType(type):
@@ -85,14 +171,14 @@ class AType(type):
 
 class A(object):
     __metaclass__ = AType
-    @dualproperty
+    @DualProperty
     def foo(self):
         return 'A.foo'
 
 A.foo -> 'AType.foo'
 A().foo -> 'A.foo'
 
-See also dualmethod.
+See also DualMethod.
     """
     def __new__(cls, func, type_callback=None):
         obj = object.__new__(cls)

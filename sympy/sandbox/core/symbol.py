@@ -12,54 +12,42 @@ class Symbol(ArithMeths, Atom, str):
 
     _dummy_count = 0
     is_dummy = False
+
     
-    #@memoizer_Symbol_new
     def __new__(cls, name, dummy=False, **options):
         # when changing the Symbol signature then change memoizer_Symbol_new
-        # accordingly
+        # accordingly    
         assert isinstance(name, str), `name`
-        obj = str.__new__(cls, name)
-        obj.is_dummy = dummy
         if dummy:
-            Symbol._dummy_count += 1
-            obj.dummy_index = Symbol._dummy_count
-        return obj
+            return Dummy(name)
+        return str.__new__(cls, name)
 
     @property
     def name(self): return str.__str__(self)
 
     def torepr(self):
-        if self.is_dummy:
-            return '%s(%r, dummy=True)' % (self.__class__.__name__, str(self))
-        return '%s(%r)' % (self.__class__.__name__, str(self))
+        return '%s(%r)' % (self.__class__.__name__, self.name)
 
     def tostr(self, level=0):
-        if self.is_dummy:
-            return '_' + str.__str__(self)
-        return str.__str__(self)
+        return self.name
 
     def compare(self, other):
         if self is other: return 0
         c = cmp(self.__class__, other.__class__)
         if c: return c
-        if self.is_dummy or other.is_dummy:
-            return cmp(id(self), id(other))
         return cmp(str(self), str(other))
 
     def __eq__(self, other):
-        if isinstance(other, Symbol):
-            if self is other: return True
-            if self.is_dummy or other.is_dummy:
-                return False
-        elif self.is_dummy: return False
-        return str.__eq__(self, other)
+        if isinstance(other, Basic):
+            if other.is_Dummy: return False
+        return str.__eq__(self, other)            
 
     def __call__(self, *args):
         signature = Basic.FunctionSignature((Basic,)*len(args), (Basic,))
         return Basic.UndefinedFunction(self, signature)(*args)
 
     def as_dummy(self):
-        return self.__class__(str.__str__(self), dummy=True)
+        return Dummy(self.name)
 
     __hash__ = str.__hash__
 
@@ -68,8 +56,28 @@ class Symbol(ArithMeths, Atom, str):
             return Basic.one
         return Basic.zero
 
+    def fdiff(self, index=1):
+        return Basic.zero
 
-class Wild(Symbol):
+class Dummy(Symbol):
+    """ Dummy Symbol.
+    """
+    def __new__(cls, name):
+        Symbol._dummy_count += 1
+        obj = str.__new__(cls, name)
+        obj.dummy_index = Symbol._dummy_count        
+        return obj
+
+    def torepr(self):
+        return '%s(%r)' % (self.__class__.__name__, self.name)
+
+    def tostr(self, level=0):
+        return '_' + self.name
+
+    def __eq__(self, other):
+        return self is other
+
+class Wild(Dummy):
     """
     Wild() matches any expression but another Wild().
     """
@@ -77,7 +85,7 @@ class Wild(Symbol):
     def __new__(cls, name=None, exclude=None):
         if name is None:
             name = 'W%s' % (Symbol._dummy_count+1)
-        obj = Symbol.__new__(cls, name, dummy=True)
+        obj = Dummy.__new__(cls, name)
         if exclude is None:
             obj.exclude = None
         else:

@@ -193,3 +193,6 @@ class Add(ImmutableMeths, MutableAdd):
         (2*a + 3*sin)(x) -> 2*a(x) + 3*sin(x)
         """
         return Add(*[(t(*args), e) for (t,e) in self.items()])
+
+    def fdiff(self, index=1):
+        return Add(*[(t.fdiff(index), e) for (t,e) in self.items()])

@@ -218,6 +218,23 @@ class Mul(ImmutableMeths, MutableMul):
         """
         return Mul(*[(t(*args), e) for (t,e) in self.items()])
 
+    def fdiff(self, index=1):
+        # (sin*cos)' = sin'*cos + sin*cos'
+        terms = self.items()
+        factors = []
+        for i in xrange(len(terms)):
+            b,e = terms[i]
+            dbase = b.fdiff(index)
+            dexp = e.fdiff(index)
+            if dexp.is_zero:
+                dt = b**(e-1) * dbase * e
+            else:
+                dt = b**e * (dexp * Basic.log(b) + dbase * e/b)
+            if dt.is_zero:
+                continue
+            factors.append(Mul(*(terms[:i]+[dt]+terms[i+1:])))
+        return Basic.Add(*factors)
+
 class Pow(Basic):
     """
     For backward compatibility.

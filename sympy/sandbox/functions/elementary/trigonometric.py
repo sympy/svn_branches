@@ -34,7 +34,6 @@ class sin(SingleValuedFunction):
             return -sin(-arg)
         return
 
-    @classmethod
     def fdiff(cls, index=1):
         if index!=1:
             raise ValueError('%s takes 1 argument, reguested %sth' % (cls.__name__, index))
@@ -52,7 +51,6 @@ class cos(SingleValuedFunction):
             if arg.is_negative: return cls(-arg)
             return
 
-    @classmethod
     def fdiff(cls, index=1):
         if index!=1:
             raise ValueError('%s takes 1 argument, reguested %sth' % (cls.__name__, index))
@@ -69,7 +67,6 @@ class exp(SingleValuedFunction):
             if arg.is_zero: return Basic.one
             return
 
-    @classmethod
     def fdiff(cls, index=1):
         if index!=1:
             raise ValueError('%s takes 1 argument, reguested %sth' % (cls.__name__, index))
@@ -86,7 +83,6 @@ class log(SingleValuedFunction):
             if arg.is_one: return Basic.zero
             return
 
-    @classmethod
     def fdiff(cls, index=1):
         if index!=1:
             raise ValueError('%s takes 1 argument, reguested %sth' % (cls.__name__, index))
@@ -105,7 +101,6 @@ class tan(SingleValuedFunction):
             if arg.is_negative: return -cls(-arg)
 
 
-    @classmethod
     def fdiff(cls, index=1):
         if index!=1:
             raise ValueError('%s takes 1 argument, reguested %sth' % (cls.__name__, index))
@@ -121,8 +116,6 @@ class cot(SingleValuedFunction):
         if arg.is_Number:
             pass
 
-
-    @classmethod
     def fdiff(cls, index=1):
         if index!=1:
             raise ValueError('%s takes 1 argument, reguested %sth' % (cls.__name__, index))

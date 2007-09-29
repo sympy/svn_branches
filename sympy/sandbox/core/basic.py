@@ -1,6 +1,6 @@
 
 from parser import Expr
-from utils import memoizer_immutable_args, dualproperty
+from utils import memoizer_immutable_args, DualProperty
 
 ordering_of_classes = [
     'int','long',
@@ -25,11 +25,11 @@ class BasicType(type):
         if name=='Basic':
             attrdict['is_Basic'] = property(lambda self: True)
         else:
-            attrdict['is_'+name] = dualproperty(lambda self:True)
+            attrdict['is_'+name] = DualProperty(lambda self:True)
             setattr(Basic, 'is_' + name,
-                    dualproperty(lambda self:False,
+                    DualProperty(lambda self:False,
                                  lambda cls:isinstance(cls, getattr(Basic, name))))
-            
+
         # create Class:
         cls = type.__new__(typ, name, bases, attrdict)
 
@@ -42,20 +42,22 @@ class BasicType(type):
     def __cmp__(cls, other):
         if cls is other: return 0
         if not isinstance(other, type):
-            return cmp(cls, other.__class__) or -1            
+            if isinstance(other.__class__, Basic):
+                return cmp(cls, other.__class__) or -1
+            return -1
         n1 = cls.__name__
         n2 = other.__name__
         unknown = len(ordering_of_classes)+1
         try:
             i1 = ordering_of_classes.index(n1)
         except ValueError:
-            if not cls.undefined_Function:
+            if not issubclass(cls, Basic.UndefinedFunction):
                 print 'ordering_of_classes is missing',n1,cls
             i1 = unknown
         try:
             i2 = ordering_of_classes.index(n2)
         except ValueError:
-            if not other.undefined_Function:
+            if not issubclass(cls, Basic.UndefinedFunction):
                 print 'ordering_of_classes is missing',n2,other
             i2 = unknown
         if i1 == unknown and i2 == unknown:
@@ -65,7 +67,6 @@ class BasicType(type):
 class Basic(object):
 
     __metaclass__ = BasicType
-    undefined_Function = False
 
     Lambda_precedence = 1
     Add_precedence = 40
@@ -173,9 +174,7 @@ class Basic(object):
         return cmp(id(self), id(other))
 
     def __eq__(self, other):
-        other = sympify(other)
-        if self is other: return True
-        return False
+        raise NotImplementedError('%s.__eq__(%s)' % (self.__class__.__name__, other.__class__.__name__))
 
     def __nonzero__(self):
         # prevent using constructs like:
@@ -279,7 +278,6 @@ class Basic(object):
 
     def try_derivative(self, s):
         raise NotImplementedError('%s.try_derivative' % (self.__class__.__name__))
-        return
 
     def split(self, op, *args, **kwargs):
         return [self]

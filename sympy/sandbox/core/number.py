@@ -83,6 +83,8 @@ class Number(NumberMeths, Atom):
         """
         return self
 
+    def fdiff(self, index=1):
+        return Basic.zero
 
 class Real(Number):
 

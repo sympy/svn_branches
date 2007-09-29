@@ -1,6 +1,7 @@
 
 import types
-from utils import dualmethod, dualproperty
+#from utils import dualmethod, dualproperty, FDiffMethod, Decorator
+from utils import DualMethod, DualProperty, FDiffMethod
 from basic import Atom, Composite, Basic, BasicType, sympify
 from methods import ArithMeths
 
@@ -83,16 +84,14 @@ class FunctionClass(ArithMeths, Atom, BasicType):
             # defined functions
             name, bases, attrdict = args
 
-            attrdict['is_undefined_Function'] = False
-            
-            attrdict['is_'+name] = dualproperty(lambda self:True)
+            attrdict['is_'+name] = DualProperty(lambda self:True)
             setattr(Basic, 'is_' + name,
                     property(lambda self:False,
                              lambda cls:isinstance(cls, getattr(Basic, name))))
             
             func = type.__new__(typ, name, bases, attrdict)
 
-            typ._set_methods_as_dual(func, attrdict)
+            typ._fix_methods(func, attrdict)
 
             # predefined objest is used by parser
             Basic.predefined_objects[name] = func
@@ -103,32 +102,32 @@ class FunctionClass(ArithMeths, Atom, BasicType):
         return func
 
     @classmethod
-    def _set_methods_as_dual(cls, func, attrdict):
+    def _fix_methods(cls, func, attrdict):
+        """ Apply DualMethod and FDiffMethod to func methods.
+        """
         name = func.__name__
         methods = []
         names = []
-        for n in attrdict.keys():
-            if n in ['__new__', '__init__']:
+        mth_names = []
+        for c in func.mro():
+            if c.__module__=='__builtin__':
                 continue
-            mth = attrdict[n]
-            if isinstance(mth, types.FunctionType) and cls.__dict__.has_key(n):
-                methods.append((n, mth))
-                names.append(n)
-        for c in func.__bases__:
-            for n in getattr(c,'_dualmethod_names',[]):
-                if n not in names:
-                    mth = getattr(c, n)
-                    methods.append((n, mth))
-                    names.append(n)
-        for (n,mth) in methods:
-            # being verbose for a while:
-            print 'applying dualmethod to %s.%s' % (name, n)
-            setattr(func, n, dualmethod(mth))
-        func._dualmethod_names = names
+            for n,mth in c.__dict__.items():
+                if not isinstance(mth, (types.FunctionType,DualMethod)):
+                    continue
+                if n in mth_names: continue
+                mth_names.append(n)
+                # being verbose for a while:
+                if n=='fdiff':
+                    #print 'applying FDiffMethod to %s.%s' % (name, n)
+                    setattr(func, n, FDiffMethod(mth, name))
+                else:
+                    #print 'applying DualMethod to %s.%s (using %s.%s)' % (name, n, c.__name__, n)
+                    setattr(func, n, DualMethod(mth, name))
         return
 
     def torepr(cls):
-        if cls.is_undefined_Function:
+        if issubclass(cls, UndefinedFunction):
             for b in cls.__bases__:
                 if b.__name__.endswith('Function'):
                     return "%s('%s')" % (b.__name__, cls.__name__)
@@ -138,23 +137,15 @@ class FunctionClass(ArithMeths, Atom, BasicType):
     def tostr(cls, level=0):
         return cls.__name__
 
-    def get_precedence(cls):
-        return Basic.Atom_precedence
-
     @property
     def precedence(cls):
         return Basic.Atom_precedence
-
-    #precedence = Basic.Atom_precedence
 
     def try_power(cls, exponent):
         return
 
     def split(cls, op, *args, **kwargs):
         return [cls]
-
-    def fdiff(cls, index=0):
-        raise NotImplementedError('%s.fdiff' % (cls.__name__))
 
     def atoms(cls, type=None):
         if type is not None and not isinstance(type, (object.__class__, tuple)):
@@ -163,7 +154,12 @@ class FunctionClass(ArithMeths, Atom, BasicType):
             return set([cls])
         return set()
 
-Basic.FunctionClass = FunctionClass
+    def __eq__(self, other):
+        if isinstance(other, Basic):
+            if other.is_FunctionClass:
+                return self.__name__==other.__name__
+            return False
+        return self==sympify(other)
 
 class Function(ArithMeths, Composite, tuple):
     """
@@ -171,7 +167,7 @@ class Function(ArithMeths, Composite, tuple):
     Constructor of undefined classes.
 
     If Function class (or its derivative) defines a method that FunctionClass
-    also has then this method will be dualmethod, i.e. the method can be
+    also has then this method will be DualMethod, i.e. the method can be
     called as class method as well as an instance method.
     """
 
@@ -207,11 +203,12 @@ class Function(ArithMeths, Composite, tuple):
         return h
 
     def __eq__(self, other):
-        other = sympify(other)
-        if other is self: return True
-        if not other.is_Function: return False
-        if not (other.__class__.__name__==self.__class__.__name__): return False
-        return tuple.__eq__(self, other)
+        if isinstance(other, Basic):
+            if not other.is_Function: return False
+            if self.func==other.func:
+                return tuple.__eq__(self, other)
+            return False
+        return self==sympify(other)
 
     @property
     def args(self):
@@ -240,7 +237,7 @@ class Function(ArithMeths, Composite, tuple):
     def get_precedence(self):
         return Basic.Apply_precedence
 
-    @dualproperty
+    @DualProperty
     def precedence(cls):
         return Basic.Apply_precedence
 
@@ -283,16 +280,6 @@ class Function(ArithMeths, Composite, tuple):
         """
         return self.__class__(*[a(*args) for a in self.args])
 
-class UndefinedFunction(Function):
-
-    signature = FunctionSignature(None, (Basic,))
-
-class SingleValuedFunction(Function):
-    """
-    Single-valued functions.
-    """
-    signature = FunctionSignature(None, (Basic,))
-
     def try_derivative(self, s):
         i = 0
         l = []
@@ -306,6 +293,34 @@ class SingleValuedFunction(Function):
             df = self.func.fdiff(i)
             l.append(df(*args) * da)
         return Basic.Add(*l)
+
+    # See utils.FDiffMethod docs for how fdiff and instance_fdiff methods are called.
+    def fdiff(cls, index=1):
+        raise NotImplementedError('%s.fdiff(cls, index=1)' % (cls.__name__))
+
+    def instance_fdiff(self, index=1):
+        # handles: sin(cos).fdiff() -> sin'(cos) * cos' -> cos(cos) * sin
+        i = 0
+        l = []
+        for a in self.args:
+            i += 1
+            df = self.func.fdiff(i)(*self.args)
+            da = a.fdiff(index)
+            l.append(df * da)
+        return Basic.Add(*l)
+
+class UndefinedFunction(Function):
+
+    signature = FunctionSignature(None, (Basic,))
+
+    def fdiff(cls, index=1):
+        return UndefinedFunction('%s_%s' % (cls.__name__, index), cls.signature)
+
+class SingleValuedFunction(Function):
+    """
+    Single-valued functions.
+    """
+    signature = FunctionSignature(None, (Basic,))
 
 class Lambda(FunctionClass):
 
