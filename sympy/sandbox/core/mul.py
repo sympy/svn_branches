@@ -216,7 +216,7 @@ class Mul(ImmutableMeths, MutableMul):
         """
         (f**n * g**m)(x) -> f(x)**n * g(x)**m
         """
-        return Mul(*[(t(*args), e) for (t,e) in self.items()])
+        return Mul(*[(t(*args), e(*args)) for (t,e) in self.items()])
 
     def fdiff(self, index=1):
         # (sin*cos)' = sin'*cos + sin*cos'
