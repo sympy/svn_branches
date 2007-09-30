@@ -142,21 +142,30 @@ class Mul(ImmutableMeths, MutableMul):
             return list(self.items()[0])
         return [self]
 
+    @property
+    def precedence(self):
+        return Basic.Mul_precedence
+
     def tostr(self, level=0):
         seq = []
         items = self[:]
+        p = self.precedence
+        pp = Basic.Pow_precedence
         for base, exp in items:
-            basestr = base.tostr()
-            if not (base.is_Symbol or (base.is_Integer and base > 0)):
-                basestr = "(" + basestr + ")"
-            if exp.is_Integer and exp == 1:
-                seq.append(basestr)
+            if exp.is_one:
+                term = base.tostr(p)
             else:
-                expstr = exp.tostr()
-                if not (exp.is_Integer or exp.is_Symbol):
-                    expstr = "(" + expstr + ")"
-                seq.append(basestr + "**" + expstr)
-        return "*".join(seq)
+                if exp==-1:
+                    term = '1/%s' % (base.tostr(p))
+                else:
+                    term = '%s**%s' % (base.tostr(pp), exp.tostr(pp))
+                if pp <= p:
+                    term = '(%s)' % (term)
+            seq.append(term)
+        r =  '*'.join(seq).replace('*1/','/')
+        if p<=level:
+            r = '(%s)' % r
+        return r
 
     def expand(self, *args, **hints):
         """Expand an expression based on different hints. Currently

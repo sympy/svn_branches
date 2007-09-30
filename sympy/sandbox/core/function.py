@@ -227,15 +227,12 @@ class Function(ArithMeths, Composite, tuple):
                            ', '.join([a.torepr() for a in self[:]]))
 
     def tostr(self, level=0):
-        p = self.get_precedence()
+        p = self.precedence
         r = '%s(%s)' % (self.__class__.tostr(),
                         ', '.join([a.tostr() for a in self[:]]))
-        if level<=p:
+        if p<=level:
             return '(%s)' % (r)
         return r
-
-    def get_precedence(self):
-        return Basic.Apply_precedence
 
     @DualProperty
     def precedence(cls):

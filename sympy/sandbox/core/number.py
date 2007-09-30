@@ -159,13 +159,22 @@ class Rational(Real):
         return '%s(%s, %s)' % (self.__class__.__name__, p, q)
 
     def tostr(self, level=0):
-        p = repr(self.p)
+        p = str(self.p)
         if p.endswith('L'): p = p[:-1]
-        q = repr(self.q)
+        q = str(self.q)
         if q.endswith('L'): q = q[:-1]
         if self.q==1:
             return p
-        return '%s/%s' % (p, q)
+        r = '%s/%s' % (p, q)
+        if self.precedence<=level:
+            r = '(%s)' % (r)
+        return r
+
+    @property
+    def precedence(self):
+        if self.q==1:
+            return Basic.Atom_precedence
+        return Basic.Mul_precedence
 
     @property
     def is_positive(self):

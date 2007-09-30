@@ -7,11 +7,11 @@ ordering_of_classes = [
     
     'ImaginaryUnit','Infinity','ComplexInfinity','NaN','Exp1','Pi',
     'Integer','Fraction','Real','Interval',
-    'Symbol',
+    'Symbol','Dummy','Wild',
     'MutableMul', 'Mul', 'MutableAdd', 'Add',
     'FunctionClass',
     'Function',
-    'sin','cos',
+    'sin','cos','exp','log','tan','cot',
     'Equality','Unequality','StrictInequality','Inequality',
     ]
 
@@ -182,9 +182,6 @@ class Basic(object):
         #   if a: ..
         raise AssertionError("only Relational and Number classes can define __nonzero__ method, %r" % (self.__class__))
 
-    def get_precedence(self):
-        raise NotImplementedError('%s.get_precedence()' % (self.__class__.__name__))
-
     def subs(self, old, new):
         old = sympify(old)
         new = sympify(new)
@@ -292,7 +289,8 @@ class Atom(Basic):
     def torepr(self):
         return '%s()' % (self.__class__.__name__)
 
-    def get_precedence(self):
+    @property
+    def precedence(self):
         return Basic.Atom_precedence
 
 

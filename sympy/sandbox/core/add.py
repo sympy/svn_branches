@@ -158,25 +158,28 @@ class Add(ImmutableMeths, MutableAdd):
     def tostr(self, level=0):
         seq = []
         items = self[:]
+        pp = Basic.Mul_precedence
         p = self.precedence
         for term, coef in items:
-            if coef > 0:
-                if seq: seq.append(" + ")
+            if coef.is_one:
+                t = term.tostr(p)
+            elif term.is_one:
+                t = coef.tostr(p)
             else:
-                if seq: seq.append(" - ")
-                else:   seq.append("-")
-                coef = -coef
-            if term == 1:
-                seq.append(coef.tostr(p))
-            elif coef.is_Integer and coef == 1:
-                seq.append(term.tostr(p))
-            elif coef.is_Fraction:
-                seq.append("(" + coef.tostr() + ")" + "*" + term.tostr(p))
+                if coef==-1:
+                    t = '-%s' % (term.tostr(p))
+                else:
+                    t = '%s*%s' % (coef.tostr(p), term.tostr(p))
+            if seq:
+                if t.startswith('-'):
+                    seq += ['-',t[1:]]
+                else:
+                    seq += ['+',t]
             else:
-                seq.append(coef.tostr(p) + "*" + term.tostr(p))
-        r = "".join(seq)
+                seq += [t]
+        r = ' '.join(seq)
         if p<=level:
-            return '(%s)' % r
+            r = '(%s)' % r
         return r
 
     def expand(self, *args, **hints):
