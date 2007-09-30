@@ -183,10 +183,8 @@ class Basic(object):
         raise AssertionError("only Relational and Number classes can define __nonzero__ method, %r" % (self.__class__))
 
     def subs(self, old, new):
-        old = sympify(old)
-        new = sympify(new)
-        if self==old:
-            return new
+        if self==sympify(old):
+            return sympify(new)
         return self
 
     def atoms(self, type=None):

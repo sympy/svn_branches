@@ -264,9 +264,6 @@ class Function(ArithMeths, Composite, tuple):
     def split(cls, op, *args, **kwargs):
         return [cls]
 
-    def try_power(cls, exponent):
-        return
-
     def atoms(self, type=None):
         return Basic.atoms(self, type).union(self.__class__.atoms(type))
 

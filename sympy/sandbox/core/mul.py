@@ -38,10 +38,21 @@ class MutableMul(ArithMeths, MutableCompositeDict):
             return
         if a.is_MutableMul:
             # Mul({x:3}).update(Mul({x:2}), 4) -> Mul({x:3}).update(x,2*4)
-            for k,v in a.items():
-                # todo?: make it noncommutative product for (a**2)**(1/2)
-                #        (a**z)**w where z,w are complex numbers
-                self.update(k, v * p)
+            p = sympify(p)
+            if p.is_Integer:
+                for k,v in a.items():
+                    self.update(k, v * p)
+            else:
+                for k,v in a.items():
+                    if k.is_positive:
+                        self.update(k, v * p)
+                    else:
+                        t = k**v
+                        b = self.get(t, None)
+                        if b is None:
+                            self[t] = sympify(p)
+                        else:
+                            self[t] = b + p
             return
         b = self.get(a,None)
         if b is None:
