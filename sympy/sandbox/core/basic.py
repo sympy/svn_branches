@@ -117,8 +117,8 @@ class Basic(object):
 
         if isinstance(a, Basic):
             return a
-        #if isinstance(a, bool):
-        #    raise NotImplementedError("bool support")
+        if isinstance(a, bool):
+            return a
         if isinstance(a, (int, long)):
             return Basic.Integer(a)
         if isinstance(a, float):

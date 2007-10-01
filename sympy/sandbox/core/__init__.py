@@ -19,6 +19,9 @@ from interval import Interval
 from singleton import pi, I, oo, zoo, E, nan
 
 from assume import Assume, Greater
+from predicate import And, Or, XOr, Not, Implies, Equiv, \
+     Equal, Less, IsReal, IsInteger, IsRational, IsPositive,\
+     IsNegative
 
 # set repr output to pretty output:
 #Basic.set_repr_level(1)

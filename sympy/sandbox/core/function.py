@@ -25,16 +25,20 @@ class FunctionSignature:
     A function with one argument and one return value, the argument
     must be float or int instance:
     >>> f = Function('f', FunctionSignature(((float, int), ), (Basic,)))
+
+    A function with undefined number of Basic type arguments and return values:
+    >>> f = Function('f', FunctionSignature([Basic], None))    
     """
 
     def __init__(self, argument_classes = (Basic,), value_classes = (Basic,)):
         self.argument_classes = argument_classes
         self.value_classes = value_classes
-        if argument_classes is None:
-            # unspecified number of arguments
-            self.nof_arguments = None
-        else:
-            self.nof_arguments = len(argument_classes)
+        self.nof_arguments = None
+        if argument_classes is not None:
+            if isinstance(argument_classes, tuple):
+                self.nof_arguments = len(argument_classes)
+            elif isinstance(argument_classes, list):
+                self.argument_classes = tuple(self.argument_classes)
         if value_classes is None:
             # unspecified number of arguments
             self.nof_values = None
@@ -42,11 +46,16 @@ class FunctionSignature:
             self.nof_values = len(value_classes)
 
     def validate(self, args):
+        cls = self.argument_classes
         if self.nof_arguments is not None:
             if self.nof_arguments!=len(args):
                 # todo: improve exception messages
                 raise TypeError('wrong number of arguments')
             for a,cls in zip(args, self.argument_classes):
+                if not isinstance(a, cls):
+                    raise TypeError('wrong argument type %r, expected %s' % (a, cls))
+        elif cls is not None:
+            for a in args:
                 if not isinstance(a, cls):
                     raise TypeError('wrong argument type %r, expected %s' % (a, cls))
 
@@ -174,6 +183,7 @@ class Function(ArithMeths, Composite, tuple):
     __metaclass__ = FunctionClass
     
     signature = FunctionSignature(None, None)
+    return_canonize_types = (Basic,)
 
     def __new__(cls, *args, **options):
         if cls.__name__.endswith('Function'):
@@ -185,7 +195,7 @@ class Function(ArithMeths, Composite, tuple):
         args = map(sympify, args)
         cls.signature.validate(args)
         r = cls.canonize(args, **options)
-        if isinstance(r, Basic):
+        if isinstance(r, cls.return_canonize_types):
             return r
         elif r is None:
             pass
