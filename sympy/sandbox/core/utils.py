@@ -1,4 +1,34 @@
+
+import sys
+
 all_caches = {}
+
+def get_object_by_name(name, default=None):
+    """ Return object that is a value of a variable with name
+    in the local or parent namespaces.
+    """
+    frame = sys._getframe(1)
+    frames = [frame]
+    while frame is not None:
+        obj = frame.f_locals.get(name, None)
+        if obj is not None:
+            for frame in frames:
+                frame.f_locals[name] = obj
+            return obj
+        if default is not None:
+            try:
+                _name = frame.f_locals['__name__']
+            except KeyError:
+                _name = None
+            if _name is not None and _name=='__main__':
+                obj = frame.f_locals[name] = default
+                for frame in frames:
+                    frame.f_locals[name] = obj
+                return obj
+        frames.append(frame)
+        frame = frame.f_back
+    return default
+
 
 class Decorator(object):
     pass

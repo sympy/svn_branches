@@ -1,5 +1,5 @@
 
-from utils import memoizer_immutable_args
+from utils import memoizer_immutable_args, get_object_by_name
 from basic import Basic, MutableCompositeDict, sympify
 from methods import ArithMeths, ImmutableMeths#, RelationalMeths
 
@@ -15,10 +15,18 @@ class MutableMul(ArithMeths, MutableCompositeDict):
 
     # canonize methods
     
-    def update(self, a, p=1):
+    def update(self, a, p=1, force=False):
         """
         Mul({}).update(a,p) -> Mul({a:p})
         """
+        if force:
+            # p must be Basic instance
+            b = self.get(a,None)
+            if b is None:
+                self[a] = p
+            else:
+                self[a] = b + p
+            return
         if a.__class__ is dict:
             # construct Mul instance from a canonical dictionary,
             # it must contain Basic instances as keys as well as values.
@@ -36,29 +44,15 @@ class MutableMul(ArithMeths, MutableCompositeDict):
             self.update(k, p)
             self.update(v, p)
             return
+        p = sympify(p)
         if a.is_MutableMul:
             # Mul({x:3}).update(Mul({x:2}), 4) -> Mul({x:3}).update(x,2*4)
-            p = sympify(p)
             if p.is_Integer:
                 for k,v in a.items():
                     self.update(k, v * p)
-            else:
-                for k,v in a.items():
-                    if k.is_positive:
-                        self.update(k, v * p)
-                    else:
-                        t = k**v
-                        b = self.get(t, None)
-                        if b is None:
-                            self[t] = sympify(p)
-                        else:
-                            self[t] = b + p
-            return
-        b = self.get(a,None)
-        if b is None:
-            self[a] = sympify(p)
-        else:
-            self[a] = b + p
+                return
+        self.update(a, sympify(p), force=True)
+
 
     def canonical(self):
         # self will be modified in-place,
@@ -189,7 +183,7 @@ class Mul(ImmutableMeths, MutableMul):
                 base, exponent = items[0]
                 b = base.expand(*args, **hints)
                 e = exponent.expand(*args, **hints)
-                obj = expand_integer_power(b, e)
+                obj = expand_power(b, e)
             elif len(self)==2:
                 b1,e1 = items[0]
                 b2,e2 = items[1]
@@ -197,14 +191,14 @@ class Mul(ImmutableMeths, MutableMul):
                 e1 = e1.expand(*args, **hints)
                 b2 = b2.expand(*args, **hints)
                 e2 = e2.expand(*args, **hints)
-                p1 = expand_integer_power(b1, e1)
-                p2 = expand_integer_power(b2, e2)
+                p1 = expand_power(b1, e1)
+                p2 = expand_power(b2, e2)
                 obj = expand_mul2(p1, p2)
             else:
                 b1,e1 = items[0]
                 b1 = b1.expand(*args, **hints)
                 e1 = e1.expand(*args, **hints)
-                p1 = expand_integer_power(b1,e1)
+                p1 = expand_power(b1,e1)
                 p2 = Mul(*items[1:]).expand(*args, **hints)
                 obj = expand_mul2(p1, p2)
         return obj
@@ -255,6 +249,24 @@ class Mul(ImmutableMeths, MutableMul):
             factors.append(Mul(*(terms[:i]+[dt]+terms[i+1:])))
         return Basic.Add(*factors)
 
+    def try_power(self, other):
+        assumptions = get_object_by_name('__refine_assumptions__')
+        if other.is_Fraction:
+            if assumptions is not None:
+                l1 = []
+                l2 = []
+                for b, e in self.items():
+                    if assumptions.check_positive(b):
+                        l1.append(b**(e*other))
+                    else:
+                        l2.append((b,e))
+                if l1:
+                    return Mul(*(l1+l2))
+        return
+
+    def clone(self):
+        return MutableMul(*[(b.clone(), e.clone()) for b,e in self.items()]).canonical()
+
 class Pow(Basic):
     """
     For backward compatibility.
@@ -272,13 +284,18 @@ class Pow(Basic):
 def sqrt(x):
     return Pow(x, Basic.Rational(1,2))
 
-@memoizer_immutable_args('expand_integer_power')
-def expand_integer_power(x, n):
+@memoizer_immutable_args('expand_power')
+def expand_power(x, n):
     """
     x, n must be expanded
     """
     if x.is_Add and n.is_Integer and n.is_positive:
         return expand_integer_power_miller(x, n)
+    if x.is_Mul and n.is_Integer:
+        return Mul(*[k**(v*n) for k,v in x.items()])
+    if n.is_Add:
+        # x ** (a+b) -> x**a * x**b
+        return Mul(*[x**(c*k) for k,c in n.items()])
     return x ** n
 
 @memoizer_immutable_args('expand_mul2')

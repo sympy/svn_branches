@@ -199,3 +199,6 @@ class Add(ImmutableMeths, MutableAdd):
 
     def fdiff(self, index=1):
         return Add(*[(t.fdiff(index), e) for (t,e) in self.items()])
+
+    def clone(self):
+        return MutableAdd(*[(t.clone(), c.clone()) for t,c in self.items()]).canonical()

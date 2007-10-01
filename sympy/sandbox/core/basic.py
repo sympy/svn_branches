@@ -16,6 +16,8 @@ ordering_of_classes = [
     ]
 
 class BasicType(type):
+    """ Metaclass for Basic classes.
+    """
 
     def __new__(typ, name, bases, attrdict):
 
@@ -183,6 +185,8 @@ class Basic(object):
         raise AssertionError("only Relational and Number classes can define __nonzero__ method, %r" % (self.__class__))
 
     def subs(self, old, new):
+        """ Substitute subexpression old with expression new and return result.
+        """
         if self==sympify(old):
             return sympify(new)
         return self
@@ -229,8 +233,7 @@ class Basic(object):
         return self
 
     def has(self, *patterns):
-        """
-        Return True if self has any of the patterns.
+        """ Return True if self has any of the patterns.
         """
         if len(patterns)>1:
             for p in patterns:
@@ -245,10 +248,14 @@ class Basic(object):
         raise NotImplementedError('has: wild support')
 
     def diff(self, *symbols):
+        """ Return derivative with respect to symbols. If symbols contains
+        positive integer then differentation is repeated as many times as
+        is the value with respect to preceding symbol in symbols.
+        """
         new_symbols = []
         for s in symbols:
             s = Basic.sympify(s)
-            if s.is_Integer and new_symbols:
+            if s.is_Integer and new_symbols and s.is_positive:
                 last_s = new_symbols.pop()
                 new_symbols += [last_s] * int(s)
             elif s.is_Symbol:
@@ -277,8 +284,18 @@ class Basic(object):
     def split(self, op, *args, **kwargs):
         return [self]
 
-    def is_callable(self):
+    def is_callable_notused(self):
         return False
+
+    def refine(self, *assumptions):
+        if assumptions:
+            __refine_assumptions__ = Basic.Assumptions(*assumptions)
+        return self.clone()
+
+    def clone(self):
+        """ Return recreated composite object.
+        """
+        return self
 
 class Atom(Basic):
 

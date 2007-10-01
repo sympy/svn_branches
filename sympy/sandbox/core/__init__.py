@@ -18,6 +18,8 @@ from function import Function, Lambda
 from interval import Interval
 from singleton import pi, I, oo, zoo, E, nan
 
+from assume import Assume, Greater
+
 # set repr output to pretty output:
 #Basic.set_repr_level(1)
 
