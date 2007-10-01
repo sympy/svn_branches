@@ -1,17 +1,46 @@
 
 from basic import Basic, Atom
+from symbol import Symbol
 from function import Function, FunctionSignature
+
+class Boolean(Symbol):
+    pass
 
 class Predicate(Function):
     """ Base class for predicate functions.
     """
     return_canonize_types = (Basic, bool)
 
-Predicate.signature = FunctionSignature(None, (Predicate,bool))
+    def test(self, condition):
+        """ Check if condition is True if self is True.
+        """
+        return Equiv(And(self, condition), self)
+
+    def conditions(self, type=None):
+        if type is None: type = Condition
+        else: assert issubclass(type, Condition),`type`
+        s = set()
+        if isinstance(self, type):
+            s.add(self)
+        for obj in self:
+            if obj.is_Predicate:
+                s = s.union(obj.conditions(type=type))
+        return s
+
+    def refine(self):
+        conditions = self.conditions(IsComplex)
+        if not conditions: return self
+        
+
+boolean_classes = (Predicate, Boolean, bool)
+Predicate.signature = FunctionSignature(None, boolean_classes)
+
 
 class And(Predicate):
+    """ And(..) predicate.
+    """
 
-    signature = FunctionSignature([Predicate,bool], (Predicate,bool))
+    signature = FunctionSignature(list(boolean_classes), boolean_classes)
 
     @classmethod
     def canonize(cls, operants):
@@ -45,12 +74,12 @@ class And(Predicate):
 
 class Or(Predicate):
 
-    signature = FunctionSignature([Predicate,bool], (Predicate,bool))
+    signature = FunctionSignature(list(boolean_classes), boolean_classes)
 
     @classmethod
     def canonize(cls, operants):
         if not operants:
-            return False
+            return True
         if len(operants)==1:
             arg = operants[0]
             if isinstance(arg, bool):
@@ -76,12 +105,14 @@ class Or(Predicate):
                 else:
                     flag = True
         if flag:
+            if not new_operants:
+                return False
             return cls(*new_operants)
         return
 
 class XOr(Predicate):
 
-    signature = FunctionSignature([Predicate,bool], (Predicate,bool))
+    signature = FunctionSignature(list(boolean_classes), boolean_classes)
 
     @classmethod
     def canonize(cls, operants):
@@ -125,7 +156,7 @@ class XOr(Predicate):
 
 class Not(Predicate):
 
-    signature = FunctionSignature(((Predicate, bool),), (Predicate,bool))
+    signature = FunctionSignature((boolean_classes,), boolean_classes)
 
     @classmethod
     def canonize(cls, (arg,)):
@@ -135,31 +166,48 @@ class Not(Predicate):
             return arg.args[0]
 
 class Implies(Predicate):
-    signature = FunctionSignature(((Predicate,bool),(Predicate,bool)), (Predicate,bool))
+    signature = FunctionSignature((boolean_classes,boolean_classes), boolean_classes)
 
     @classmethod
     def canonize(cls, (lhs, rhs)):
         return Or(Not(lhs), rhs)
 
 class Equiv(Predicate):
-    signature = FunctionSignature(((Predicate,bool), (Predicate,bool)), (Predicate,bool))
+    signature = FunctionSignature((boolean_classes, boolean_classes), boolean_classes)
 
     @classmethod
     def canonize(cls, (lhs, rhs)):
         return Not(XOr(lhs, rhs))
 
-class Equal(Predicate):
+class Condition(Predicate):
+    """ Base class for conditions.
+    """
 
-    signature = FunctionSignature((Basic, Basic), (Predicate,bool))
+class Equal(Condition):
+
+    signature = FunctionSignature((Basic, Basic), boolean_classes)
 
     @classmethod
     def canonize(cls, (lhs, rhs)):
         if lhs==rhs: return True
         if lhs.is_Number and rhs.is_Number: return False
 
-class Less(Predicate):
+    @property
+    def lhs(self): return self[0]
+    @property
+    def rhs(self): return self[1]
 
-    signature = FunctionSignature((Basic, Basic), (Predicate,bool))
+    def __eq__(self, other):
+        if isinstance(other, Basic):
+            if not other.is_Equal: return False
+            return self[:]==other[:] or (self.lhs==other.rhs and self.rhs==other.lhs)
+        if isinstance(other, bool):
+            return False
+        return self==sympify(other)
+
+class Less(Condition):
+
+    signature = FunctionSignature((Basic, Basic), boolean_classes)
     
     @classmethod
     def canonize(cls, (lhs, rhs)):
@@ -167,10 +215,26 @@ class Less(Predicate):
             return lhs < rhs
         elif lhs==rhs: return False
 
-class IsReal(Predicate):
-    
-    signature = FunctionSignature((Basic,), (Predicate,bool))
-    
+    @property
+    def lhs(self): return self[0]
+    @property
+    def rhs(self): return self[1]
+
+class IsComplex(Condition):
+
+    signature = FunctionSignature((Basic,), boolean_classes)
+
+    @classmethod
+    def canonize(cls, (arg,)):
+        if arg.is_Real: return True
+        if arg.is_ImaginaryUnit: return True
+
+    @property
+    def expr(self):
+        return self[0]
+
+class IsReal(IsComplex):
+
     @classmethod
     def canonize(cls, (arg,)):
         if arg.is_Real: return True
@@ -179,35 +243,70 @@ class IsReal(Predicate):
 
 class IsRational(IsReal):
     
-    signature = FunctionSignature((Basic,), (Predicate,bool))
-    
     @classmethod
     def canonize(cls, (arg,)):
         if arg.is_Rational: return True
         if arg.is_Number: return False
+        if arg.is_ImaginaryUnit: return False
+
+class IsIrrational(IsReal):
+
+    @classmethod
+    def canonize(cls, (arg,)):
+        return And(IsReal(arg), Not(IsRational(arg)))
 
 class IsInteger(IsRational):
-    
-    signature = FunctionSignature((Basic,), (Predicate,bool))
     
     @classmethod
     def canonize(cls, (arg,)):
         if arg.is_Integer: return True
         if arg.is_Number: return False
+        if arg.is_ImaginaryUnit: return False
 
-class IsPositive(IsReal):
-    
-    signature = FunctionSignature((Basic,), (Predicate,bool))
+class IsFraction(IsRational):
     
     @classmethod
     def canonize(cls, (arg,)):
-        return And(IsReal(arg),Less(0, arg))
+        return And(IsRational(arg), Not(IsInteger(arg)))
 
-class IsNegative(IsReal):
-    
-    signature = FunctionSignature((Basic,), (Predicate,bool))
+class IsPrime(IsInteger):
+
+    @classmethod
+    def canonize(cls, (arg,)):
+        # need prime test
+        pass
+
+class IsComposite(IsInteger):
+
+    @classmethod
+    def canonize(cls, (arg,)):
+        return And(IsInteger(arg), Not(IsPrime(arg)))
+
+class IsNonNegative(IsReal):
     
     @classmethod
     def canonize(cls, (arg,)):
-        return And(IsReal(arg),Less(arg, 0))
+        if arg.is_ImaginaryUnit: return False
+        return Not(Less(arg, 0))
+
+class IsPositive(IsNonNegative):
+    
+    @classmethod
+    def canonize(cls, (arg,)):
+        if arg.is_ImaginaryUnit: return False
+        return Less(0, arg)
+
+class IsNonPositive(IsReal):
+    
+    @classmethod
+    def canonize(cls, (arg,)):
+        if arg.is_ImaginaryUnit: return False
+        return Not(Less(0, arg))
+
+class IsNegative(IsNonPositive):
+        
+    @classmethod
+    def canonize(cls, (arg,)):
+        if arg.is_ImaginaryUnit: return False
+        return Less(arg, 0)
         
