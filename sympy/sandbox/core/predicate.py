@@ -14,7 +14,10 @@ class Predicate(Function):
     def test(self, condition):
         """ Check if condition is True if self is True.
         """
-        return Equiv(And(self, condition), self)
+        if self==condition:
+            return True
+        r = Equiv(And(self, condition), self)
+        return r
 
     def conditions(self, type=None):
         if type is None: type = Condition
@@ -30,7 +33,21 @@ class Predicate(Function):
     def refine(self):
         conditions = self.conditions(IsComplex)
         if not conditions: return self
-        
+        expr_map = {}
+        for c in conditions:
+            e = expr_map.get(c.expr)
+            if e is None:
+                expr_map[c.expr] = c
+                continue
+            if isinstance(c, e.__class__):
+                expr_map[c.expr] = c
+        if not expr_map: return self
+        expr = self
+        for c in conditions:
+            e = expr_map.get(c.expr)
+            if e==c: continue
+            expr = expr.subs(c, e)
+        return expr
 
 boolean_classes = (Predicate, Boolean, bool)
 Predicate.signature = FunctionSignature(None, boolean_classes)
@@ -197,7 +214,7 @@ class Equal(Condition):
     @property
     def rhs(self): return self[1]
 
-    def __eq__(self, other):
+    def __eq2__(self, other):
         if isinstance(other, Basic):
             if not other.is_Equal: return False
             return self[:]==other[:] or (self.lhs==other.rhs and self.rhs==other.lhs)
