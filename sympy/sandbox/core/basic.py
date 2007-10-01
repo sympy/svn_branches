@@ -289,7 +289,7 @@ class Basic(object):
 
     def refine(self, *assumptions):
         if assumptions:
-            __refine_assumptions__ = Basic.Assumptions(*assumptions)
+            __assumptions__ = Basic.Assumptions(*assumptions)
         return self.clone()
 
     def clone(self):

@@ -250,7 +250,7 @@ class Mul(ImmutableMeths, MutableMul):
         return Basic.Add(*factors)
 
     def try_power(self, other):
-        assumptions = get_object_by_name('__refine_assumptions__')
+        assumptions = get_object_by_name('__assumptions__')
         if other.is_Fraction:
             if assumptions is not None:
                 l1 = []
