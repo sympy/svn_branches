@@ -22,11 +22,14 @@ class Predicate(Function):
         return self==sympify(other)
 
     def test(self, condition):
-        """ Check if condition is True if self is True.
+        """ Return
+        - True if the condition is True assuming self is True
+        - False if the condition contradicts with assumption self is True
+        - a condition when the test would be True
         """
         if self==condition:
             return True
-        return And(self, Implies(condition, self))
+        return Implies(condition, self).refine()
 
     def conditions(self, type=None):
         if type is None: type = Condition
