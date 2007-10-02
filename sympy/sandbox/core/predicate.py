@@ -2,11 +2,22 @@
 from basic import Basic, Atom
 from symbol import Symbol
 from function import Function, FunctionSignature
+from qm import qm
 
-class Boolean(Symbol):
+class BooleanMeths:
+
+    def __invert__(self): return Not(self)            # ~ operator
+    def __or__(self, other): return Or(self, other)   # | operator
+    def __xor__(self, other): return XOr(self, other) # ^ operator
+    def __and__(self, other): return And(self, other) # & operator
+    def __ror__(self, other): return Or(self, other)   # | operator
+    def __rxor__(self, other): return XOr(self, other) # ^ operator
+    def __rand__(self, other): return And(self, other) # & operator
+
+class Boolean(BooleanMeths, Symbol):
     pass
 
-class Predicate(Function):
+class Predicate(BooleanMeths, Function):
     """ Base class for predicate functions.
     """
     return_canonize_types = (Basic, bool)
@@ -33,7 +44,6 @@ class Predicate(Function):
 
     def conditions(self, type=None):
         if type is None: type = Condition
-        else: assert issubclass(type, Condition),`type`
         s = set()
         if isinstance(self, type):
             s.add(self)
@@ -60,6 +70,62 @@ class Predicate(Function):
             if e==c: continue
             expr = expr.subs(c, e)
         return expr
+
+    def minimize(self):
+        """ Return minimal boolean expression using Quine-McCluskey algorithm.
+
+        See
+            http://en.wikipedia.org/wiki/Quine-McCluskey_algorithm
+        """
+        expressions = list(self.atoms(Boolean).union(self.conditions()))
+        n = len(expressions)
+        r = range(n-1, -1, -1)
+        ones = []
+        for i in range(2**n):
+            expr = self
+            # http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/219300
+            bvals =  map(lambda y:bool((i>>y)&1), r)
+            for s,b in zip(expressions, bvals):
+                expr = expr.subs(s, b)
+                if isinstance(expr, bool):
+                    break
+            if expr is True:
+                ones.append(i)
+        l = []
+        r = range(n)
+        for t in qm(ones=ones):
+            assert len(t)==n,`t,n`
+            p = []
+            for c,i in zip(t,r):
+                if c=='0': p.append(Not(expressions[i]))
+                elif c=='1': p.append(expressions[i])
+                else: assert c=='X',`c`
+            l.append(And(*p))
+        return Or(*l)
+
+    def truth_table(self, expressions=None):
+        """ Compute truth table of boolean expression.
+
+        Return (table, expressions) where table is a map
+        {<boolean values>: <expression truth value>}
+        and expressions is a list conditions and boolean
+        symbols.
+        """
+        if expressions is None:
+            expressions = list(self.atoms(Boolean).union(self.conditions()))
+        n = len(expressions)
+        r = range(n-1, -1, -1)
+        table = {}
+        for i in range(2**n):
+            expr = self
+            # http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/219300
+            bvals =  tuple(map(lambda y:bool((i>>y)&1), r))
+            for s,b in zip(expressions, bvals):
+                expr = expr.subs(s, b)
+                if isinstance(expr, bool):
+                    break
+            table[bvals] = expr
+        return table, expressions
 
 boolean_classes = (Predicate, Boolean, bool)
 Predicate.signature = FunctionSignature(None, boolean_classes)
@@ -107,14 +173,18 @@ class And(Predicate):
     def __eq__(self, other):
         if isinstance(other, Basic):
             if not other.is_Function: return False
-            if self.func==other.func:
-                s1 = sorted(self.args)
-                s2 = sorted(other.args)
-                return s1==s2
+            if self.func==other.func and len(self)==len(other):
+                return sorted(self)==sorted(other)
             return False
         if isinstance(other, bool):
             return False
         return self==sympify(other)
+
+    def tostr(self, level=0):
+        r = '&'. join([c.tostr(self.precedence) for c in self])
+        if self.precedence <= level:
+            r = '(%s)' % r
+        return r
 
 class Or(Predicate):
     """
@@ -156,14 +226,18 @@ class Or(Predicate):
     def __eq__(self, other):
         if isinstance(other, Basic):
             if not other.is_Function: return False
-            if self.func==other.func:
-                s1 = sorted(self.args)
-                s2 = sorted(other.args)
-                return s1==s2
+            if self.func==other.func and len(self)==len(other):
+                return sorted(self)==sorted(other)
             return False
         if isinstance(other, bool):
             return False
         return self==sympify(other)
+
+    def tostr(self, level=0):
+        r = ' | '. join([c.tostr(self.precedence) for c in self])
+        if self.precedence <= level:
+            r = '(%s)' % r
+        return r
 
 class XOr(Predicate):
     """
@@ -224,10 +298,8 @@ class XOr(Predicate):
     def __eq__(self, other):
         if isinstance(other, Basic):
             if not other.is_Function: return False
-            if self.func==other.func:
-                s1 = set(self.args)
-                s2 = set(other.args)
-                return s1==s2
+            if self.func==other.func and len(self)==len(other):
+                return sorted(self)==sorted(other)
             return False
         if isinstance(other, bool):
             return False
@@ -243,6 +315,12 @@ class Not(Predicate):
             return not arg
         if arg.is_Not:
             return arg.args[0]
+
+    def tostr(self, level=0):
+        r = '~%s' % (self.args[0].tostr(self.precedence))
+        if self.precedence <= level:
+            r = '(%s)' % r
+        return r
 
 class Implies(Predicate):
     signature = FunctionSignature((boolean_classes,boolean_classes), boolean_classes)
@@ -276,13 +354,11 @@ class Equal(Condition):
     @property
     def rhs(self): return self[1]
 
-    def __eq2__(self, other):
-        if isinstance(other, Basic):
-            if not other.is_Equal: return False
-            return self[:]==other[:] or (self.lhs==other.rhs and self.rhs==other.lhs)
-        if isinstance(other, bool):
-            return False
-        return self==sympify(other)
+    def tostr(self, level=0):
+        r = '%s == %s' % (self.lhs.tostr(self.precedence),self.rhs.tostr(self.precedence))
+        if self.precedence <= level:
+            r = '(%s)' % r
+        return r
 
 class Less(Condition):
 
@@ -298,6 +374,12 @@ class Less(Condition):
     def lhs(self): return self[0]
     @property
     def rhs(self): return self[1]
+
+    def tostr(self, level=0):
+        r = '%s < %s' % (self.lhs.tostr(self.precedence),self.rhs.tostr(self.precedence))
+        if self.precedence <= level:
+            r = '(%s)' % r
+        return r
 
 class IsComplex(Condition):
 

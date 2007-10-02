@@ -39,6 +39,34 @@ def test_trivial():
     assert And()==True  # a AND True -> a
     assert XOr()==False # a XOR False -> a
 
+def test_operators():
+    a,b,c,d = map(Boolean,'abcd')
+    assert (~a) & b & (~c) & d == ~a & b & ~c & d
+
+def test_minimize():
+    a,b,c,d = map(Boolean,'abcd')
+    f = ~a & b & ~c & ~d | a & ~b & ~c & ~d | a & ~b & c & ~d | a & ~b & c & d
+    f = f | a & b & ~c & ~d | a & b & c & d
+    f = f | a & ~b & ~c & d | a & b & c & ~d
+    table, expressions = f.truth_table()
+    fmin = f.minimize()
+    table_min = fmin.truth_table(expressions)[0]
+    assert table==table_min
+    f1,f2 = a & c | b & ~c & ~d | a & ~b,a & c | b & ~c & ~d | a & ~d
+    assert fmin in [f1,f2]
+
+def test_minimize2():
+    a,b,c,d = Less('x',2),Less('y',1),Equal('x','y+1'),Boolean('a')
+    f = ~a & b & ~c & ~d | a & ~b & ~c & ~d | a & ~b & c & ~d | a & ~b & c & d
+    f = f | a & b & ~c & ~d | a & b & c & d
+    f = f | a & ~b & ~c & d | a & b & c & ~d
+    table, expressions = f.truth_table()
+    fmin = f.minimize()
+    table_min = fmin.truth_table(expressions)[0]
+    assert table==table_min
+    f1,f2 = a & c | b & ~c & ~d | a & ~b,a & c | b & ~c & ~d | a & ~d
+    assert fmin in [f1,f2]
+
 def test_bug1():
     x = Symbol('x')
     r1 = And(IsInteger(x), IsReal(x)).test(IsInteger(x))
