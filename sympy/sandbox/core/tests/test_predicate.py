@@ -25,3 +25,24 @@ def test_truth_table():
     assert Equiv(False, True)==False
     assert Equiv(True, False)==False
     assert Equiv(True, True)==True
+
+def test_trivial():
+    assert Or(False)==False
+    assert Or(True)==True
+    assert And(False)==False
+    assert And(True)==True
+    assert XOr(False)==False
+    assert XOr(True)==True
+
+    # logic: a <op> <nothing> -> a
+    assert Or()==False   # a OR False -> a
+    assert And()==True  # a AND True -> a
+    assert XOr()==False # a XOR False -> a
+
+def xtest_bug1():
+    x = Symbol('x')
+    r1 = And(IsInteger(x), IsReal(x)).test(IsInteger(x)).refine()
+    r2 = And(IsInteger(x), IsReal(x)).refine().test(IsInteger(x))
+    print r1
+    print r2
+    assert r1==r2

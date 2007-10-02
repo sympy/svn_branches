@@ -11,13 +11,22 @@ class Predicate(Function):
     """
     return_canonize_types = (Basic, bool)
 
+    def __eq__(self, other):
+        if isinstance(other, Basic):
+            if not other.is_Function: return False
+            if self.func==other.func:
+                return tuple.__eq__(self, other)
+            return False
+        if isinstance(other, bool):
+            return False
+        return self==sympify(other)
+
     def test(self, condition):
         """ Check if condition is True if self is True.
         """
         if self==condition:
             return True
-        r = Equiv(And(self, condition), self)
-        return r
+        return And(self, Implies(condition, self))
 
     def conditions(self, type=None):
         if type is None: type = Condition
@@ -55,79 +64,113 @@ Predicate.signature = FunctionSignature(None, boolean_classes)
 
 class And(Predicate):
     """ And(..) predicate.
+
+    a & TRUE -> a
+    a & FALSE -> FALSE
+    a & (b & c) -> a & b & c
+    a & a -> a
+    a & ~a -> FALSE
     """
 
     signature = FunctionSignature(list(boolean_classes), boolean_classes)
 
     @classmethod
     def canonize(cls, operants):
-        if not operants:
-            return True
-        if len(operants)==1:
-            arg = operants[0]
-            if isinstance(arg, bool):
-                return arg
-            return arg
-        new_operants = []
+        new_operants = set()
         flag = False
         for o in operants:
-            if isinstance(o, bool):
+            if isinstance(o, And):
+                new_operants = new_operants.union(set(o.args))
                 flag = True
+            elif isinstance(o, bool):
                 if not o: return False
-            elif o.is_And:
                 flag = True
-                new_operants.extend(o[:])
             else:
-                if o not in new_operants:
-                    p = Not(o)
-                    if p in new_operants:
-                        return False
-                    new_operants.append(o)
-                else:
+                n = len(new_operants)
+                new_operants.add(o)
+                if n==len(new_operants):
                     flag = True
+        for o in list(new_operants):
+            if Not(o) in new_operants:
+                return False
+        if not new_operants:
+            return True
+        if len(new_operants)==1:
+            return new_operants.pop()
         if flag:
             return cls(*new_operants)
-        return
+        return        
+
+    def __eq__(self, other):
+        if isinstance(other, Basic):
+            if not other.is_Function: return False
+            if self.func==other.func:
+                s1 = sorted(self.args)
+                s2 = sorted(other.args)
+                return s1==s2
+            return False
+        if isinstance(other, bool):
+            return False
+        return self==sympify(other)
 
 class Or(Predicate):
-
+    """
+    a | TRUE -> TRUE
+    a | FALSE -> a
+    a | (b | c) -> a | b | c
+    a | a -> a
+    a | ~a -> TRUE
+    """
     signature = FunctionSignature(list(boolean_classes), boolean_classes)
 
     @classmethod
     def canonize(cls, operants):
-        if not operants:
-            return True
-        if len(operants)==1:
-            arg = operants[0]
-            if isinstance(arg, bool):
-                return arg
-            return arg
-        new_operants = []
+        new_operants = set()
         flag = False
         for o in operants:
-            if isinstance(o, bool):
+            if isinstance(o, Or):
+                new_operants = new_operants.union(set(o.args))
                 flag = True
+            elif isinstance(o, bool):
                 if o: return True
-            elif o.is_Or:
                 flag = True
-                new_operants.extend(o[:])
             else:
-                if o not in new_operants:
-                    p = Not(o)
-                    if p in new_operants:
-                        new_operants.remove(p)
-                        flag = True
-                    else:
-                        new_operants.append(o)
-                else:
+                n=len(new_operants)
+                new_operants.add(o)
+                if n==len(new_operants):
                     flag = True
+        for o in list(new_operants):
+            if Not(o) in new_operants:
+                return True
+        if not new_operants:
+            return False
+        if len(new_operants)==1:
+            return new_operants.pop()
         if flag:
-            if not new_operants:
-                return False
             return cls(*new_operants)
         return
 
+    def __eq__(self, other):
+        if isinstance(other, Basic):
+            if not other.is_Function: return False
+            if self.func==other.func:
+                s1 = sorted(self.args)
+                s2 = sorted(other.args)
+                return s1==s2
+            return False
+        if isinstance(other, bool):
+            return False
+        return self==sympify(other)
+
 class XOr(Predicate):
+    """
+    a ^ TRUE -> ~a
+    a ^ FALSE -> a
+    a ^ (b ^ c) -> a ^ b ^ c
+    a ^ a -> FALSE
+    a ^ ~a -> TRUE
+    """
+
 
     signature = FunctionSignature(list(boolean_classes), boolean_classes)
 
@@ -137,31 +180,35 @@ class XOr(Predicate):
             return False
         if len(operants)==1:
             arg = operants[0]
-            if isinstance(arg, bool):
-                return arg
             return arg
+        if False in operants:
+            return cls(*[o for o in operants if o is not False])
         new_operants = []        
         flag = False
         truth_index = 0
         for o in operants:
             if isinstance(o, bool):
                 flag = True
-                if o: truth_index +=1
-                else: pass
-            elif o.is_Or:
+                if o: truth_index += 1
+            elif o.is_XOr:
                 flag = True
-                new_operants.extend(o[:])
+                new_operants.extend(o.args)
             else:
-                if o not in new_operants:
-                    po = Not(o)
-                    if po in new_operants:
-                        flag = True
-                        truth_index += 1
-                    else:
-                        new_operants.append(o)
-                else:
-                    new_operants.remove(o)
+                new_operants.append(o)
+        operants = new_operants
+        new_operants = []
+        for o in operants:
+            if o not in new_operants:
+                po = Not(o)
+                if po in new_operants:
                     flag = True
+                    truth_index += 1
+                    new_operants.remove(po)
+                else:
+                    new_operants.append(o)
+            else:
+                new_operants.remove(o)
+                flag = True
         if flag:
             if truth_index % 2:
                 if new_operants:
@@ -170,6 +217,18 @@ class XOr(Predicate):
                     return True
             return cls(*new_operants)
         return
+
+    def __eq__(self, other):
+        if isinstance(other, Basic):
+            if not other.is_Function: return False
+            if self.func==other.func:
+                s1 = set(self.args)
+                s2 = set(other.args)
+                return s1==s2
+            return False
+        if isinstance(other, bool):
+            return False
+        return self==sympify(other)
 
 class Not(Predicate):
 
