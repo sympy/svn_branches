@@ -1,4 +1,4 @@
-__version__ = "0.5.3-svn"
+__version__ = "0.5.4"
 
 from sympy.core import *
 
