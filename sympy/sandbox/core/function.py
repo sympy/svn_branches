@@ -327,6 +327,17 @@ class SingleValuedFunction(Function):
     signature = FunctionSignature(None, (Basic,))
 
 class Lambda(FunctionClass):
+    """
+    Lambda(x, expr) represents a lambda function similar to Python's
+    'lambda x: expr'. A function of several variables is written
+    Lambda((x, y, ...), expr).
+
+    A simple example:
+        >>> x = Symbol('x')
+        >>> f = Lambda(x, x**2)
+        >>> f(4)
+        16
+    """
 
     def __new__(cls, arguments, expression):
         if not isinstance(arguments, (tuple,list)):
@@ -337,6 +348,12 @@ class Lambda(FunctionClass):
         if expr.is_Function and tuple(arguments)==expr.args:
             return expr.__class__
         args = []
+        # The bound variables must be changed to dummy symbols; otherwise
+        # wrong results will be obtained if the Lambda is called with some
+        # of the symbols that were used to define it. For example, without
+        # dummy variables, Lambda((x, y), x*y)(y, x) would evaluate to
+        # x**2 instead of x*y because the bound x gets mixed up with the
+        # unbound x.
         for a in arguments:
             d = a.as_dummy()
             expr = expr.subs(a, d)
