@@ -349,11 +349,11 @@ class Lambda(FunctionClass):
             return expr.__class__
         args = []
         # The bound variables must be changed to dummy symbols; otherwise
-        # wrong results will be obtained if the Lambda is called with some
-        # of the symbols that were used to define it. For example, without
-        # dummy variables, Lambda((x, y), x*y)(y, x) would evaluate to
-        # x**2 instead of x*y because the bound x gets mixed up with the
-        # unbound x.
+        # wrong results will be obtained if the Lambda is called with some of
+        # the symbols that were used to define it. For example, without dummy
+        # variables, Lambda((x, y), x*y)(y, x) will evaluate to x**2 or y**2
+        # (depending on the order of substitution) instead of x*y because the
+        # bound x or y gets mixed up with the unbound x or y.
         for a in arguments:
             d = a.as_dummy()
             expr = expr.subs(a, d)
