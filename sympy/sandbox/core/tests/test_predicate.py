@@ -74,7 +74,7 @@ def test_bug1():
     r2 = And(IsInteger(x), IsReal(x)).refine().test(IsInteger(x))
     assert r1==r2
 
-def test_test():
+def test_inclusion():
     x = Symbol('x')
     a = IsInteger(x)
     assert a.test(IsInteger(x))==True
@@ -87,7 +87,6 @@ def test_test():
     assert a.test(IsPrime(x))==IsPrime(x)
     assert a.test(And(IsPrime(x),IsEven(x)))==And(IsPrime(x),IsEven(x))
 
-
     a = IsEven(x)
     assert a.test(IsInteger(x))==True
     assert a.test(IsFraction(x))==False
@@ -98,8 +97,6 @@ def test_test():
     assert a.test(IsEven(x))==True
     assert a.test(IsOdd(x))==False
     assert a.test(IsPrime(x))==IsPrime(x)
-
-
 
 def test_test_logic():
     a = Boolean('a')
@@ -128,9 +125,25 @@ def test_signed():
     assert a.test(IsNonPositive(x))==False
     assert a.test(IsNegative(x))==False
     assert a.test(IsNonNegative(x))==True
+    assert a.test(IsZero(x))==False
+
+    a = IsNegative(x)
+    assert a.test(IsNegative(x))==True
+    assert a.test(IsNonNegative(x))==False
+    assert a.test(IsPositive(x))==False
+    assert a.test(IsNonPositive(x))==True
+    assert a.test(IsZero(x))==False
 
     a = IsNonPositive(x)
     assert a.test(IsPositive(x))==False
     assert a.test(IsNonPositive(x))==True
-    #assert a.test(And(a,Not(IsZero(x))))==Not(IsZero(x))
-    #assert a.test(IsNonNegative(x))==IsZero(x)
+    assert a.test(IsNegative(x))==Not(IsZero(x))
+    assert a.test(IsNonNegative(x))==IsZero(x)
+    assert a.test(IsZero(x))==IsNonNegative(x)
+
+    a = IsNonNegative(x)
+    assert a.test(IsNegative(x))==False
+    assert a.test(IsNonNegative(x))==True
+    assert a.test(IsPositive(x))==Not(IsZero(x))
+    assert a.test(IsNonPositive(x))==IsZero(x)
+    assert a.test(IsZero(x))==IsNonPositive(x)

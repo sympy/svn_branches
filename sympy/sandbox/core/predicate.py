@@ -28,6 +28,17 @@ class BooleanMeths:
         """
         return False
 
+    def intersection_subset(self, other):
+        """ Assume that self = smth xor smth2 and other = smth xor smth3.
+        Return smth or None.
+        """
+        return
+
+    def minus_subset(self, other, negative=False):
+        """ Assume self = smth xor other. Return smth or None.
+        """
+        return
+
     def truth_table(self, atoms=None):
         """ Compute truth table of boolean expression.
 
@@ -110,6 +121,10 @@ class BooleanMeths:
         l = []
         for bvals in table.values():
             t = test.subs_list(atoms, bvals)
+            if isinstance(t, Basic):
+                tt_atoms = t.atoms(Boolean).union(t.conditions())
+                if tt_atoms.intersection(atoms):
+                    print t
             if t is False:
                 continue
             if t is True and indices:
@@ -411,13 +426,26 @@ class Condition(Predicate):
             if old.is_subset_of(self):
                 # IsInteger(x).subs(IsOdd(x), True) -> True
                 return True
-            if old.is_opposite_to(self):
+            elif old.is_opposite_to(self):
                 # IsInteger(x).subs(IsFraction(x), True) -> False
                 return False
+            elif self.is_subset_of(old):
+                # IsNegative(x).subs(IsNonPositive(x), True) -> Not(IsZero(x))
+                smth = old.minus_subset(self, negative=True)
+                if smth is not None:
+                    return smth
+            smth = self.intersection_subset(old)
+            if smth is not None:
+                return smth
         if new is False:
             if self.is_subset_of(old):
                 # IsInteger(x).subs(IsReal(x), False) -> False
                 return False
+            if old.is_subset_of(self):
+                # IsNonPositive(x).subs(IsNegative(x), False) -> IsZero(x)
+                smth = self.minus_subset(old)
+                if smth is not None:
+                    return smth
         return self        
 
 
@@ -549,7 +577,7 @@ def get_opposite_classes_map():
                 IsNegative=(IsNonNegative, IsPositive, IsZero, IsImaginary,),
                 IsNonPositive=(IsPositive, IsImaginary, ),
                 IsNonNegative=(IsNegative, IsImaginary, ),
-                IsZero=(IsPositive,IsNegative, IsPrime, IsOdd)
+                IsZero=(IsPositive, IsNegative, IsPrime, IsOdd)
                 )
 
 class Inclusion(Condition):
@@ -578,20 +606,40 @@ class Inclusion(Condition):
                     return True
         return False
 
+    def minus_subset(self, other, negative=False):
+        """ Assume self = smth xor other. Return smth.
+        """
+        if other.is_Inclusion:
+            if self.expr==other.expr:
+                if (self.__class__ is IsNonPositive and other.__class__ is IsNegative) \
+                       or (self.__class__ is IsNonNegative and other.__class__ is IsPositive):
+                    if negative:
+                        return Not(IsZero(self.expr))
+                    return IsZero(self.expr)
+                if self.__class__ is IsNonPositive and other.__class__ is IsZero:
+                    if negative:
+                        return IsNonNegative(self.expr)
+                    return IsNegative(self.expr)
+                if self.__class__ is IsNonNegative and other.__class__ is IsZero:
+                    if negative:
+                        return IsNonPositive(self.expr)
+                    return IsPositive(self.expr)
+        return
+
+    def intersection_subset(self, other):
+        if other.is_Inclusion:
+            if self.expr==other.expr:
+                if self.__class__ is IsNonPositive and other.__class__ is IsNonNegative:
+                    return IsZero(self.expr)
+                if other.__class__ is IsNonPositive and self.__class__ is IsNonNegative:
+                    return IsZero(self.expr)
+
 class IsComplex(Inclusion):
 
     @classmethod
     def canonize(cls, (arg,)):
         if arg.is_Real: return True
         if arg.is_ImaginaryUnit: return True
-
-class IsZero(IsComplex):
-    @classmethod
-    def canonize(cls, (arg,)):
-        if arg.is_Number:
-            return arg==0
-        if arg.is_Add and len(arg)==1:
-            return IsZero(arg.items()[0][0])
 
 class IsReal(IsComplex):
 
@@ -679,7 +727,6 @@ class IsOdd(IsInteger):
         if arg.is_Number:
             return False
 
-
 class Signed(IsReal):
 
     signature = FunctionSignature((Basic,), boolean_classes)
@@ -692,7 +739,6 @@ class IsNonPositive(Signed):
     def canonize(cls, (arg,)):
         if arg.is_Number:
             return arg <= 0
-        #return Or(IsPositive(-arg), IsZero(arg))
 
 class IsNonNegative(Signed):
     
@@ -718,4 +764,13 @@ class IsNegative(IsNonPositive):
     def canonize(cls, (arg,)):
         if arg.is_Number:
             return arg < 0
+
+class IsZero(IsNonNegative, IsNonPositive, IsEven, IsComposite):
+    @classmethod
+    def canonize(cls, (arg,)):
+        if arg.is_Number:
+            return arg==0
+        if arg.is_Add and len(arg)==1:
+            # IsZero(2*x) -> IsZero(x)
+            return IsZero(arg.items()[0][0])
 
