@@ -18,10 +18,13 @@ from function import Function, Lambda
 from interval import Interval
 from singleton import pi, I, oo, zoo, E, nan
 
-from assume import Assume, Greater
+import assume
 from predicate import And, Or, XOr, Not, Implies, Equiv, \
      Equal, Less, IsReal, IsInteger, IsRational, IsPositive,\
-     IsNegative, Boolean
+     IsNegative, Boolean, IsNonPositive, IsNonNegative, \
+     IsPrime, IsComposite, IsFraction, IsComplex, LessEqual, \
+     GreaterEqual, Greater, IsImaginary, IsEven, IsOdd, IsZero \
+
 
 # set repr output to pretty output:
 #Basic.set_repr_level(1)

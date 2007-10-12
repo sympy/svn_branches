@@ -1,11 +1,15 @@
 
-from basic import Basic, Atom
-from symbol import Symbol
-from function import Function, FunctionSignature
+from basic import Basic, Atom, sympify
+from symbol import BasicSymbol, BasicDummySymbol
+from function import Function, FunctionSignature, FunctionClass
 from qm import qm
+from utils import memoizer_immutable_args
 
 class BooleanMeths:
 
+    def __nonzero__(self): return False
+
+    # convenience methods:
     def __invert__(self): return Not(self)            # ~ operator
     def __or__(self, other): return Or(self, other)   # | operator
     def __xor__(self, other): return XOr(self, other) # ^ operator
@@ -14,35 +18,114 @@ class BooleanMeths:
     def __rxor__(self, other): return XOr(self, other) # ^ operator
     def __rand__(self, other): return And(self, other) # & operator
 
-class Boolean(BooleanMeths, Symbol):
-    pass
-
-class Predicate(BooleanMeths, Function):
-    """ Base class for predicate functions.
-    """
-    return_canonize_types = (Basic, bool)
-
-    def __eq__(self, other):
-        if isinstance(other, Basic):
-            if not other.is_Function: return False
-            if self.func==other.func:
-                return tuple.__eq__(self, other)
-            return False
-        if isinstance(other, bool):
-            return False
-        return self==sympify(other)
-
-    def test(self, condition):
-        """ Return
-        - True if the condition is True assuming self is True
-        - False if the condition contradicts with assumption self is True
-        - a condition when the test would be True
+    def is_subset_of(self, other):
+        """ Returns True if from other follows self.
         """
-        if self==condition:
-            return True
-        return Implies(condition, self).refine()
+        return False
+
+    def is_opposite_to(self, other):
+        """ Returns True if from not other follows self.
+        """
+        return False
+
+    def truth_table(self, atoms=None):
+        """ Compute truth table of boolean expression.
+
+        Return (atoms, table) where table is a map
+          {<tuple of boolean values>: <self truth value>}
+        and atoms is a list conditions and boolean
+        symbols.
+        """
+        if atoms is None:
+            atoms = list(self.atoms(Boolean).union(self.conditions()))
+        n = len(atoms)
+        r = range(n-1, -1, -1)
+        table = {}
+        for i in range(2**n):
+            # http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/219300
+            bvals =  tuple(map(lambda y:bool((i>>y)&1), r))
+            table[bvals] = self.subs_list(atoms, bvals)
+        return atoms, table
+
+
+    @memoizer_immutable_args('BooleanMeths.compute_truth_table')
+    def compute_truth_table(self):
+        """ Compute full truth table.
+
+        Return (atoms, table) where table is a map
+          {<integer value>: <list of boolean values>}
+        where integer value is obtained from binary representation
+        of boolean values. The table contains only combinations
+        of boolean values that evaluate self to True.
+        """        
+        conditions = sorted(self.conditions())
+        atoms = sorted(self.atoms(Boolean))
+        table = {}
+        if conditions:
+            bsyms = [DummyBoolean('b%s' % (i)) for i in range(len(conditions))]
+            expr = self.subs_list(conditions, bsyms)
+            syms = map(str, atoms + bsyms)
+        else:
+            expr = self
+            syms = map(str, atoms)
+        n = len(syms)
+        r = range(n-1,-1,-1)
+        string_expr = expr.tostr()
+        for i in range(2**n):
+            bvals =  map(lambda y:bool((i>>y)&1), r)
+            dvals = {}
+            for s,b in zip(syms, bvals):
+                dvals[s] = b
+            v = eval(string_expr, dvals, {'XOr':XOr})
+            if v is True:
+                table[i] = bvals
+            else:
+                assert isinstance(v, bool),`v`
+        return atoms + conditions, table
+
+    def test(self, test):
+        """
+        Return conditions when test holds assuming that self is True.
+        """
+        test = sympify(test)
+        if isinstance(test, bool): return test
+        atoms, table = self.compute_truth_table()
+        if not table:
+            raise ValueError('assumption expression %r is never True' % (str(self)))
+        t_atoms = sorted(test.atoms(Boolean).union(test.conditions()))
+        n = len(atoms)
+        indices = []
+        for i in range(n):
+            a = atoms[i]
+            if a in t_atoms:
+                continue
+            flag = True
+            for t in t_atoms:
+                if t.is_subset_of(a) or a.is_subset_of(t):
+                    flag = False
+                    break
+            if flag:
+                indices.append(i)
+        r = range(n-1, -1, -1)
+        l = []
+        for bvals in table.values():
+            t = test.subs_list(atoms, bvals)
+            if t is False:
+                continue
+            if t is True and indices:
+                bvals = bvals[:]
+                for i in indices:
+                    bvals[i] = atoms[i]
+                t = self.subs_list(atoms, bvals)
+            l.append(t)
+        if not l:
+            return False
+        return And(*l)
 
     def conditions(self, type=None):
+        """
+        Return a set of Condition instances.
+        """
         if type is None: type = Condition
         s = set()
         if isinstance(self, type):
@@ -52,84 +135,61 @@ class Predicate(BooleanMeths, Function):
                 s = s.union(obj.conditions(type=type))
         return s
 
-    def refine(self):
-        conditions = self.conditions(IsComplex)
-        if not conditions: return self
-        expr_map = {}
-        for c in conditions:
-            e = expr_map.get(c.expr)
-            if e is None:
-                expr_map[c.expr] = c
-                continue
-            if isinstance(c, e.__class__):
-                expr_map[c.expr] = c
-        if not expr_map: return self
-        expr = self
-        for c in conditions:
-            e = expr_map.get(c.expr)
-            if e==c: continue
-            expr = expr.subs(c, e)
-        return expr
-
     def minimize(self):
         """ Return minimal boolean expression using Quine-McCluskey algorithm.
 
         See
             http://en.wikipedia.org/wiki/Quine-McCluskey_algorithm
+
+        Note:
+          The algorithm does not know about XOR operator. So, expressions
+          containing XOr instances may not be minimal.
         """
-        expressions = list(self.atoms(Boolean).union(self.conditions()))
-        n = len(expressions)
-        r = range(n-1, -1, -1)
-        ones = []
-        for i in range(2**n):
-            expr = self
-            # http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/219300
-            bvals =  map(lambda y:bool((i>>y)&1), r)
-            for s,b in zip(expressions, bvals):
-                expr = expr.subs(s, b)
-                if isinstance(expr, bool):
-                    break
-            if expr is True:
-                ones.append(i)
+        atoms, table = self.compute_truth_table()
+        n = len(atoms)
         l = []
         r = range(n)
-        for t in qm(ones=ones):
-            assert len(t)==n,`t,n`
+        q = qm(ones=table.keys(), vars=n)
+        for t in q:
             p = []
             for c,i in zip(t,r):
-                if c=='0': p.append(Not(expressions[i]))
-                elif c=='1': p.append(expressions[i])
-                else: assert c=='X',`c`
+                if c=='0': p.append(Not(atoms[i]))
+                elif c=='1': p.append(atoms[i])
             l.append(And(*p))
         return Or(*l)
 
-    def truth_table(self, expressions=None):
-        """ Compute truth table of boolean expression.
+class Boolean(BooleanMeths, BasicSymbol):
 
-        Return (table, expressions) where table is a map
-        {<boolean values>: <expression truth value>}
-        and expressions is a list conditions and boolean
-        symbols.
-        """
-        if expressions is None:
-            expressions = list(self.atoms(Boolean).union(self.conditions()))
-        n = len(expressions)
-        r = range(n-1, -1, -1)
-        table = {}
-        for i in range(2**n):
-            expr = self
-            # http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/219300
-            bvals =  tuple(map(lambda y:bool((i>>y)&1), r))
-            for s,b in zip(expressions, bvals):
-                expr = expr.subs(s, b)
-                if isinstance(expr, bool):
-                    break
-            table[bvals] = expr
-        return table, expressions
+    def as_dummy(self):
+        return DummyBoolean(self.name)
 
-boolean_classes = (Predicate, Boolean, bool)
+    def compute_truth_table(self):
+        return [self],{1:[True]}
+
+    def conditions(self, type=None):
+        return set()
+
+    def minimize(self):
+        return self
+
+class DummyBoolean(BasicDummySymbol, Boolean):
+
+    pass
+
+
+
+class Predicate(BooleanMeths, Function):
+    """ Base class for predicate functions.
+    """
+    return_canonize_types = (Basic, bool)
+
+    @memoizer_immutable_args('Predicate.__new__')
+    def __new__(cls, *args):
+        return Function.__new__(cls, *args)
+
+
+boolean_classes = (Predicate, Boolean, bool, FunctionClass)
 Predicate.signature = FunctionSignature(None, boolean_classes)
-
 
 class And(Predicate):
     """ And(..) predicate.
@@ -168,23 +228,15 @@ class And(Predicate):
             return new_operants.pop()
         if flag:
             return cls(*new_operants)
+        operants.sort(Basic.compare)
         return        
 
-    def __eq__(self, other):
-        if isinstance(other, Basic):
-            if not other.is_Function: return False
-            if self.func==other.func and len(self)==len(other):
-                return sorted(self)==sorted(other)
-            return False
-        if isinstance(other, bool):
-            return False
-        return self==sympify(other)
-
     def tostr(self, level=0):
-        r = '&'. join([c.tostr(self.precedence) for c in self])
+        r = ' and '. join([c.tostr(self.precedence) for c in self])
         if self.precedence <= level:
             r = '(%s)' % r
         return r
+
 
 class Or(Predicate):
     """
@@ -221,20 +273,11 @@ class Or(Predicate):
             return new_operants.pop()
         if flag:
             return cls(*new_operants)
+        operants.sort(Basic.compare)
         return
 
-    def __eq__(self, other):
-        if isinstance(other, Basic):
-            if not other.is_Function: return False
-            if self.func==other.func and len(self)==len(other):
-                return sorted(self)==sorted(other)
-            return False
-        if isinstance(other, bool):
-            return False
-        return self==sympify(other)
-
     def tostr(self, level=0):
-        r = ' | '. join([c.tostr(self.precedence) for c in self])
+        r = ' or '. join([c.tostr(self.precedence) for c in self])
         if self.precedence <= level:
             r = '(%s)' % r
         return r
@@ -293,17 +336,16 @@ class XOr(Predicate):
                 else:
                     return True
             return cls(*new_operants)
+        operants.sort(Basic.compare)
         return
-
-    def __eq__(self, other):
-        if isinstance(other, Basic):
-            if not other.is_Function: return False
-            if self.func==other.func and len(self)==len(other):
-                return sorted(self)==sorted(other)
-            return False
-        if isinstance(other, bool):
-            return False
-        return self==sympify(other)
+    
+    def tostr(self, level=0):
+        return '%s(%s)' % (self.__class__.__name__,
+                           ', '.join([c.tostr(self.precedence) for c in self]))
+        r = ' xor '. join([c.tostr(self.precedence) for c in self])
+        if self.precedence <= level:
+            r = '(%s)' % r
+        return r
 
 class Not(Predicate):
 
@@ -314,85 +356,242 @@ class Not(Predicate):
         if isinstance(arg, bool):
             return not arg
         if arg.is_Not:
-            return arg.args[0]
+            return arg[0]
 
     def tostr(self, level=0):
-        r = '~%s' % (self.args[0].tostr(self.precedence))
+        r = ' not %s' % (self.args[0].tostr(self.precedence))
         if self.precedence <= level:
             r = '(%s)' % r
         return r
 
+
+class LogicalIdentity(Predicate):
+    signature = FunctionSignature((boolean_classes,), boolean_classes)
+    @classmethod
+    def canonize(cls, (arg,)):
+        return arg
+
+# Implies = Or(Not, LogicalIdentity)
 class Implies(Predicate):
+
     signature = FunctionSignature((boolean_classes,boolean_classes), boolean_classes)
 
     @classmethod
     def canonize(cls, (lhs, rhs)):
         return Or(Not(lhs), rhs)
 
+# Equiv = Not(XOr)
 class Equiv(Predicate):
+
     signature = FunctionSignature((boolean_classes, boolean_classes), boolean_classes)
 
     @classmethod
     def canonize(cls, (lhs, rhs)):
         return Not(XOr(lhs, rhs))
 
+#
+#
+#
+
 class Condition(Predicate):
     """ Base class for conditions.
+
+    Number of conditions can be expressed in terms of
+    other conditions. The following classes are
+    fundamental conditions:
+      Equal, Less
+      IsComplex, IsReal, IsRational, IsInteger, IsPrime
     """
 
-class Equal(Condition):
+    def subs(self, old, new):
+        old = sympify(old)
+        new = sympify(new)
+        if self==old: return new
+        if new is True:
+            if old.is_subset_of(self):
+                # IsInteger(x).subs(IsOdd(x), True) -> True
+                return True
+            if old.is_opposite_to(self):
+                # IsInteger(x).subs(IsFraction(x), True) -> False
+                return False
+        if new is False:
+            if self.is_subset_of(old):
+                # IsInteger(x).subs(IsReal(x), False) -> False
+                return False
+        return self        
+
+
+#
+# Relational conditions
+#
+
+class Relational(Condition):
 
     signature = FunctionSignature((Basic, Basic), boolean_classes)
-
-    @classmethod
-    def canonize(cls, (lhs, rhs)):
-        if lhs==rhs: return True
-        if lhs.is_Number and rhs.is_Number: return False
 
     @property
     def lhs(self): return self[0]
     @property
     def rhs(self): return self[1]
 
+    def minimize(self):
+        return self
+
+    def decompose(self, conditional=False):
+        return self
+
+class Equal(Relational):
+
+    @classmethod
+    def canonize(cls, (lhs, rhs)):
+        return IsZero(lhs-rhs)
+        if lhs==rhs:
+            return True
+        if lhs.is_Number and rhs.is_Number:
+            return False
+        if not rhs.is_zero:
+            return Equal(lhs-rhs, 0)
+
     def tostr(self, level=0):
-        r = '%s == %s' % (self.lhs.tostr(self.precedence),self.rhs.tostr(self.precedence))
+        r = '%s == %s' % (self.lhs.tostr(self.precedence),
+                          self.rhs.tostr(self.precedence))
         if self.precedence <= level:
             r = '(%s)' % r
         return r
 
-class Less(Condition):
+class Less(Relational):
 
-    signature = FunctionSignature((Basic, Basic), boolean_classes)
-    
     @classmethod
     def canonize(cls, (lhs, rhs)):
         if lhs.is_Number and rhs.is_Number:
             return lhs < rhs
-        elif lhs==rhs: return False
-
-    @property
-    def lhs(self): return self[0]
-    @property
-    def rhs(self): return self[1]
+        if lhs==rhs:
+            return False
+        return IsPositive(rhs-lhs)
+        if not rhs.is_zero:
+            return Less(lhs-rhs, 0)
 
     def tostr(self, level=0):
-        r = '%s < %s' % (self.lhs.tostr(self.precedence),self.rhs.tostr(self.precedence))
+        r = '%s < %s' % (self.lhs.tostr(self.precedence),
+                         self.rhs.tostr(self.precedence))
         if self.precedence <= level:
             r = '(%s)' % r
-        return r
+        return r    
 
-class IsComplex(Condition):
+class LessEqual(Relational):
+    @classmethod
+    def canonize(cls, (lhs, rhs)):
+        return Or(Less(lhs, rhs), Equal(lhs, rhs))
+
+class GreaterEqual(Relational):
+    @classmethod
+    def canonize(cls, (lhs, rhs)):
+        return Or(Less(rhs, lhs), Equal(lhs, rhs))
+
+class Greater(Relational):
+
+    @classmethod
+    def canonize(cls, (lhs, rhs)):
+        return Less(rhs, lhs)
+
+## class IsNonNegative(Predicate):
+##     signature = FunctionSignature((Basic,), boolean_classes)
+##     @classmethod
+##     def canonize(cls, (arg,)):
+##         if arg.is_ImaginaryUnit: return False
+##         return Not(Less(arg, 0))
+
+## class IsPositive(Predicate):
+
+##     signature = FunctionSignature((Basic,), boolean_classes)
+    
+##     @classmethod
+##     def canonize(cls, (arg,)):
+##         if arg.is_ImaginaryUnit: return False
+##         return Less(0, arg)
+
+## class IsNonPositive(Predicate):
+
+##     signature = FunctionSignature((Basic,), boolean_classes)
+    
+##     @classmethod
+##     def canonize(cls, (arg,)):
+##         if arg.is_ImaginaryUnit: return False
+##         return Not(Less(0, arg))
+
+## class IsNegative(Predicate):
+
+##     signature = FunctionSignature((Basic,), boolean_classes)
+    
+##     @classmethod
+##     def canonize(cls, (arg,)):
+##         if arg.is_ImaginaryUnit: return False
+##         return Less(arg, 0)
+
+#
+# Inclusion conditions:
+#
+
+@memoizer_immutable_args('get_opposite_classes_map')
+def get_opposite_classes_map():
+    return dict(IsComplex=(),
+                IsReal=(IsImaginary,),
+                IsImaginary=(IsReal,),
+                IsRational=(IsIrrational, IsImaginary,),
+                IsIrrational=(IsRational, IsImaginary,),
+                IsInteger=(IsFraction, IsIrrational, IsImaginary,),
+                IsFraction=(IsInteger, IsIrrational, IsImaginary,),
+                IsOdd=(IsZero, IsEven, IsFraction, IsIrrational, IsImaginary,),
+                IsEven=(IsOdd,IsFraction, IsIrrational, IsImaginary,),
+                IsPrime=(IsZero, IsComposite, IsFraction, IsIrrational, IsImaginary,),
+                IsComposite=(IsPrime, IsFraction, IsIrrational, IsImaginary,),
+                IsPositive=(IsNonPositive, IsNegative, IsZero, IsImaginary,),
+                IsNegative=(IsNonNegative, IsPositive, IsZero, IsImaginary,),
+                IsNonPositive=(IsPositive, IsImaginary, ),
+                IsNonNegative=(IsNegative, IsImaginary, ),
+                IsZero=(IsPositive,IsNegative, IsPrime, IsOdd)
+                )
+
+class Inclusion(Condition):
 
     signature = FunctionSignature((Basic,), boolean_classes)
+
+    @property
+    def expr(self):
+        return self[0]
+
+    def is_subset_of(self, other):
+        if other.is_Inclusion:
+            if self.expr==other.expr:
+                if isinstance(self, other.__class__):
+                    return True
+        return False
+
+    def is_opposite_to(self, other):
+        if other.is_Inclusion:
+            if self.expr==other.expr:
+                clses = get_opposite_classes_map().get(self.__class__.__name__)
+                if clses is not None and isinstance(other,clses):
+                    return True
+            elif self.is_Signed and other.is_Signed:
+                if self.__class__ is other.__class__ and self.expr==-other.expr:
+                    return True
+        return False
+
+class IsComplex(Inclusion):
 
     @classmethod
     def canonize(cls, (arg,)):
         if arg.is_Real: return True
         if arg.is_ImaginaryUnit: return True
 
-    @property
-    def expr(self):
-        return self[0]
+class IsZero(IsComplex):
+    @classmethod
+    def canonize(cls, (arg,)):
+        if arg.is_Number:
+            return arg==0
+        if arg.is_Add and len(arg)==1:
+            return IsZero(arg.items()[0][0])
 
 class IsReal(IsComplex):
 
@@ -401,6 +600,13 @@ class IsReal(IsComplex):
         if arg.is_Real: return True
         if arg.is_Number: return False
         if arg.is_ImaginaryUnit: return False
+
+class IsImaginary(IsComplex):
+
+    @classmethod
+    def canonize(cls, (arg,)):
+        if arg.is_Number: return False
+        if arg.is_ImaginaryUnit: return True
 
 class IsRational(IsReal):
     
@@ -414,7 +620,8 @@ class IsIrrational(IsReal):
 
     @classmethod
     def canonize(cls, (arg,)):
-        return And(IsReal(arg), Not(IsRational(arg)))
+        if arg.is_Rational: return False
+        if arg.is_ImaginaryUnit: return False
 
 class IsInteger(IsRational):
     
@@ -428,46 +635,87 @@ class IsFraction(IsRational):
     
     @classmethod
     def canonize(cls, (arg,)):
-        return And(IsRational(arg), Not(IsInteger(arg)))
+        if arg.is_Fraction: return True
+        if arg.is_Number: return False
+        if arg.is_ImaginaryUnit: return False
 
 class IsPrime(IsInteger):
 
     @classmethod
     def canonize(cls, (arg,)):
-        # need prime test
-        pass
+        if arg.is_Integer:
+            if arg<=0: return False
+            from ntheory.primetest import isprime
+            return isprime(arg)
+        if arg.is_Number:
+            return False
 
 class IsComposite(IsInteger):
 
     @classmethod
     def canonize(cls, (arg,)):
-        return And(IsInteger(arg), Not(IsPrime(arg)))
+        if arg.is_Integer:
+            if arg<=0: return True
+            from ntheory.primetest import isprime
+            return not isprime(arg)
+        if arg.is_Number:
+            return False
 
-class IsNonNegative(IsReal):
+class IsEven(IsInteger):
+
+    @classmethod
+    def canonize(cls, (arg,)):
+        if arg.is_Integer:
+            return arg % 2==0
+        if arg.is_Number:
+            return False
+
+class IsOdd(IsInteger):
+
+    @classmethod
+    def canonize(cls, (arg,)):
+        if arg.is_Integer:
+            return arg % 2==1
+        if arg.is_Number:
+            return False
+
+
+class Signed(IsReal):
+
+    signature = FunctionSignature((Basic,), boolean_classes)
+
+class IsNonPositive(Signed):
+    """ Represents condition x <= 0.
+    """
     
     @classmethod
     def canonize(cls, (arg,)):
-        if arg.is_ImaginaryUnit: return False
-        return Not(Less(arg, 0))
+        if arg.is_Number:
+            return arg <= 0
+        #return Or(IsPositive(-arg), IsZero(arg))
+
+class IsNonNegative(Signed):
+    
+    @classmethod
+    def canonize(cls, (arg,)):
+        if arg.is_Number:
+            return arg >= 0
+
 
 class IsPositive(IsNonNegative):
-    
-    @classmethod
-    def canonize(cls, (arg,)):
-        if arg.is_ImaginaryUnit: return False
-        return Less(0, arg)
+    """ Represents condition x > 0.
+    """
 
-class IsNonPositive(IsReal):
-    
     @classmethod
     def canonize(cls, (arg,)):
-        if arg.is_ImaginaryUnit: return False
-        return Not(Less(0, arg))
+        if arg.is_Number:
+            return arg > 0
+
 
 class IsNegative(IsNonPositive):
-        
+
     @classmethod
     def canonize(cls, (arg,)):
-        if arg.is_ImaginaryUnit: return False
-        return Less(arg, 0)
-        
+        if arg.is_Number:
+            return arg < 0
+

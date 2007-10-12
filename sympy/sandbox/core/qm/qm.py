@@ -5,7 +5,7 @@
 Copyright 2004, Robert Dick (dickrp@ece.northwestern.edu).
 
 Routines to compute the optimal sum of products implementation from sets of
-don't-care terms, minterms, and maxterms.
+don\'t-care terms, minterms, and maxterms.
 
 Command-line usage example:
   qm.py -o1,2,5 -d0,7
@@ -14,10 +14,14 @@ Library usage example:
   import qm
   print qm.qm(ones=[1, 2, 5], dc=[0, 7])
 
-Please see the license at the end of the source code for legal information.'''
+Please see the license at the end of the source code for legal information.
+
+Changes:
+3 Oct 2007, pearu: add vars keyword argument.
+'''
 
 
-__version__ = '0.1'
+__version__ = '0.1.1'
 __author__ = 'Robert Dick (dickrp@ece.northwestern.edu)'
 
 
@@ -35,7 +39,9 @@ def qm(**kargs):
 	  zeros: list of maxterms'''
 
 	all = kargs.get('ones', []) + kargs.get('zeros', []) + kargs.get('dc', [])
-	vars = int(math.ceil(math.log(max(all) + 1, 2)))
+        vars = kargs.get('vars', None)
+        if vars is None:
+	    vars = int(math.ceil(math.log(max(all) + 1, 2)))
 	elts = 2 << vars
 	assert not kargs.get('ones') or not kargs.get('zeros')
 	dc = set(b2s(i, vars) for i in kargs.get('dc', []))

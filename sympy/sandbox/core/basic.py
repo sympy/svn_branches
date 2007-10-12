@@ -3,16 +3,20 @@ from parser import Expr
 from utils import memoizer_immutable_args, DualProperty
 
 ordering_of_classes = [
-    'int','long',
-    
+    'int','long','str',
     'ImaginaryUnit','Infinity','ComplexInfinity','NaN','Exp1','Pi',
     'Integer','Fraction','Real','Interval',
-    'Symbol','Dummy','Wild',
+    'Symbol','Dummy','Wild','Boolean','DummyBoolean',
     'MutableMul', 'Mul', 'MutableAdd', 'Add',
     'FunctionClass',
     'Function',
     'sin','cos','exp','log','tan','cot',
     'Equality','Unequality','StrictInequality','Inequality',
+    'Equal','Less',
+    'Not','And','XOr','Or',
+    'IsComplex','IsReal','IsImaginary','IsRational','IsIrrational',
+    'IsInteger','IsFraction','IsPrime','IsComposite','IsEven','IsOdd',
+    'IsZero','IsPositive','IsNonPositive',
     ]
 
 class BasicType(type):
@@ -173,7 +177,19 @@ class Basic(object):
         if self is other: return 0
         c = cmp(self.__class__, other.__class__)
         if c: return c
-        return cmp(id(self), id(other))
+        if isinstance(self, str):
+            return cmp(str(self), str(other))
+        st = self[:]
+        ot = other[:]
+        c = cmp(len(st), len(ot))
+        if c: return c
+        for l,r in zip(st,ot):
+            if isinstance(l, Basic):
+                c = l.compare(r)
+            else:
+                c = cmp(l, r)
+            if c: return c
+        return 0
 
     def __eq__(self, other):
         raise NotImplementedError('%s.__eq__(%s)' % (self.__class__.__name__, other.__class__.__name__))
@@ -190,6 +206,20 @@ class Basic(object):
         if self==sympify(old):
             return sympify(new)
         return self
+
+    def subs_dict(self, old_new_dict):
+        r = self
+        for old,new in old_new_dict.items():
+            r = r.subs(old,new)
+            if not isinstance(r, Basic): break
+        return r
+
+    def subs_list(self, expressions, values):
+        r = self
+        for e,b in zip(expressions, values):
+            r = r.subs(e,b)
+            if not isinstance(r, Basic): break
+        return r
 
     def atoms(self, type=None):
         """Returns the atoms that form current object.

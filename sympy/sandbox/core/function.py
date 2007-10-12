@@ -45,19 +45,19 @@ class FunctionSignature:
         else:
             self.nof_values = len(value_classes)
 
-    def validate(self, args):
+    def validate(self, funcname, args):
         cls = self.argument_classes
         if self.nof_arguments is not None:
             if self.nof_arguments!=len(args):
-                # todo: improve exception messages
-                raise TypeError('wrong number of arguments')
+                raise TypeError('%s: wrong number of arguments, expected %s, got %s'\
+                                % (funcname, self.nof_arguments, len(args)))
             for a,cls in zip(args, self.argument_classes):
                 if not isinstance(a, cls):
-                    raise TypeError('wrong argument type %r, expected %s' % (a, cls))
+                    raise TypeError('%s: wrong argument type %r, expected %s' % (funcname, a, cls))
         elif cls is not None:
             for a in args:
                 if not isinstance(a, cls):
-                    raise TypeError('wrong argument type %r, expected %s' % (a, cls))
+                    raise TypeError('%s: wrong argument type %r, expected %s' % (funcname, a, cls))
 
     def __repr__(self):
         return '%s(%r, %r)' % (self.__class__.__name__,
@@ -163,12 +163,27 @@ class FunctionClass(ArithMeths, Atom, BasicType):
             return set([cls])
         return set()
 
+    def compare(self, other):
+        raise
+        if isinstance(other, Basic):
+            if other.is_FunctionClass:
+                return cmp(self.__name__, other.__name__)
+        c = cmp(self.__class__, other.__class__)
+        if c: return c
+        raise NotImplementedError(`self, other`)
+
     def __eq__(self, other):
         if isinstance(other, Basic):
             if other.is_FunctionClass:
                 return self.__name__==other.__name__
             return False
-        return self==sympify(other)
+        if isinstance(other, bool):
+            return False
+        if isinstance(other, type):
+            if isinstance(self, type):
+                return self.__name__ == other.__name__
+            return False
+        return sympify(other)==self
 
 class Function(ArithMeths, Composite, tuple):
     """
@@ -193,7 +208,7 @@ class Function(ArithMeths, Composite, tuple):
                 cls = UndefinedFunction
             return FunctionClass(cls, *args)
         args = map(sympify, args)
-        cls.signature.validate(args)
+        cls.signature.validate(cls.__name__, args)
         r = cls.canonize(args, **options)
         if isinstance(r, cls.return_canonize_types):
             return r
@@ -208,7 +223,7 @@ class Function(ArithMeths, Composite, tuple):
         try:
             return self.__dict__['_cached_hash']
         except KeyError:
-            h = hash((self.__class__.__class__, tuple(self)))
+            h = hash((self.__class__.__name__, tuple(self)))
             self._cached_hash = h
         return h
 
@@ -217,6 +232,8 @@ class Function(ArithMeths, Composite, tuple):
             if not other.is_Function: return False
             if self.func==other.func:
                 return tuple.__eq__(self, other)
+            return False
+        if isinstance(other, bool):
             return False
         return self==sympify(other)
 

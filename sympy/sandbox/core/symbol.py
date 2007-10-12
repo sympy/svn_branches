@@ -1,25 +1,19 @@
 
 from utils import memoizer_immutable_args, memoizer_Symbol_new
 from basic import Atom, Basic, sympify
-from methods import ArithMeths#, RelationalMeths
+from methods import ArithMeths
 
-class Symbol(ArithMeths, Atom, str):
-
-    """ Represents a symbol.
-
-    Symbol('x', dummy=True) returns a unique Symbol instance.
-    """
+class BasicSymbol(Atom, str):
 
     _dummy_count = 0
     is_dummy = False
 
-    
     def __new__(cls, name, dummy=False, **options):
         # when changing the Symbol signature then change memoizer_Symbol_new
         # accordingly    
         assert isinstance(name, str), `name`
         if dummy:
-            return Dummy(name)
+            return str.__new__(cls, name).as_dummy()
         return str.__new__(cls, name)
 
     @property
@@ -31,42 +25,20 @@ class Symbol(ArithMeths, Atom, str):
     def tostr(self, level=0):
         return self.name
 
-    def compare(self, other):
-        if self is other: return 0
-        c = cmp(self.__class__, other.__class__)
-        if c: return c
-        return cmp(str(self), str(other))
-
     def __eq__(self, other):
         if isinstance(other, Basic):
             if other.is_Dummy: return False
         return str.__eq__(self, other)            
 
-    def __call__(self, *args):
-        signature = Basic.FunctionSignature((Basic,)*len(args), (Basic,))
-        return Basic.UndefinedFunction(self, signature)(*args)
-
-    def as_dummy(self):
-        return Dummy(self.name)
-
     __hash__ = str.__hash__
 
-    def try_derivative(self, s):
-        if self==s:
-            return Basic.one
-        return Basic.zero
+class BasicDummySymbol(BasicSymbol):
 
-    def fdiff(self, index=1):
-        return Basic.zero
-
-class Dummy(Symbol):
-    """ Dummy Symbol.
-    """
     def __new__(cls, name):
-        Symbol._dummy_count += 1
+        BasicSymbol._dummy_count += 1
         obj = str.__new__(cls, name)
-        obj.dummy_index = Symbol._dummy_count        
-        return obj
+        obj.dummy_index = BasicSymbol._dummy_count        
+        return obj    
 
     def torepr(self):
         return '%s(%r)' % (self.__class__.__name__, self.name)
@@ -76,6 +48,34 @@ class Dummy(Symbol):
 
     def __eq__(self, other):
         return self is other
+
+
+class Symbol(ArithMeths, BasicSymbol):
+
+    """ Represents a symbol.
+
+    Symbol('x', dummy=True) returns a unique Symbol instance.
+    """
+
+    def __call__(self, *args):
+        signature = Basic.FunctionSignature((Basic,)*len(args), (Basic,))
+        return Basic.UndefinedFunction(self, signature)(*args)
+
+    def as_dummy(self):
+        return Dummy(self.name)
+
+    def try_derivative(self, s):
+        if self==s:
+            return Basic.one
+        return Basic.zero
+
+    def fdiff(self, index=1):
+        return Basic.zero
+
+class Dummy(BasicDummySymbol, Symbol):
+    """ Dummy Symbol.
+    """
+
 
 class Wild(Dummy):
     """
