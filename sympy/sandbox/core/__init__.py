@@ -23,7 +23,8 @@ from predicate import And, Or, XOr, Not, Implies, Equiv, \
      Equal, Less, IsReal, IsInteger, IsRational, IsPositive,\
      IsNegative, Boolean, IsNonPositive, IsNonNegative, \
      IsPrime, IsComposite, IsFraction, IsComplex, LessEqual, \
-     GreaterEqual, Greater, IsImaginary, IsEven, IsOdd, IsZero \
+     GreaterEqual, Greater, IsImaginary, IsEven, IsOdd, IsZero, \
+     IsIrrational, IsNonZero
 
 
 # set repr output to pretty output:

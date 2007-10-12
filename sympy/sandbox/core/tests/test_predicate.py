@@ -68,6 +68,34 @@ def test_minimize2():
             a & c | b & ~c & ~d | a & ~d
     assert fmin in [f1,f2]
 
+def test_normalize():
+    x = Symbol('x')
+    assert IsComplex(2*x/3)==IsComplex(x)
+    assert IsReal(2*x/3)==IsReal(x)
+    assert IsImaginary(2*x/3)==IsImaginary(x)
+    assert IsRational(2*x/3)==IsRational(x)
+    assert IsIrrational(2*x/3)==IsIrrational(x)
+    assert IsInteger(2*x)==IsInteger(x)
+    assert IsInteger(2*x/3)==IsInteger(x/3)
+    assert IsInteger(-x/3)==IsInteger(x/3)
+    assert IsFraction(-2*x)==IsFraction(2*x)
+    assert IsOdd(-2*x)==IsOdd(x)
+    assert IsOdd(-3*x)==IsOdd(3*x)
+    assert IsEven(-3*x)==IsEven(x)
+    assert IsEven(-3*x/2)==IsEven(3*x/2)
+    assert IsComposite(-2*x)==IsComposite(2*x)
+    assert IsPrime(-2*x)==IsPrime(-2*x)
+
+    assert IsPositive(2*x)==IsPositive(x)
+    assert IsNegative(2*x/3)==IsNegative(x)
+    assert IsPositive(-2*x)==IsNegative(x)
+    assert IsNegative(-2*x/3)==IsPositive(x)
+    assert IsNonPositive(2*x)==IsNonPositive(x)
+    assert IsNonNegative(2*x/3)==IsNonNegative(x)
+    assert IsNonPositive(-2*x)==IsNonNegative(x)
+    assert IsNonNegative(-2*x/3)==IsNonPositive(x)
+    assert IsZero(-2*x/3)==IsZero(x)
+    
 def test_bug1():
     x = Symbol('x')
     r1 = And(IsInteger(x), IsReal(x)).test(IsInteger(x))
@@ -137,13 +165,13 @@ def test_signed():
     a = IsNonPositive(x)
     assert a.test(IsPositive(x))==False
     assert a.test(IsNonPositive(x))==True
-    assert a.test(IsNegative(x))==Not(IsZero(x))
+    assert a.test(IsNegative(x))==IsNonZero(x)
     assert a.test(IsNonNegative(x))==IsZero(x)
     assert a.test(IsZero(x))==IsNonNegative(x)
 
     a = IsNonNegative(x)
     assert a.test(IsNegative(x))==False
     assert a.test(IsNonNegative(x))==True
-    assert a.test(IsPositive(x))==Not(IsZero(x))
+    assert a.test(IsPositive(x))==IsNonZero(x)
     assert a.test(IsNonPositive(x))==IsZero(x)
     assert a.test(IsZero(x))==IsNonPositive(x)

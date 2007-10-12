@@ -577,7 +577,8 @@ def get_opposite_classes_map():
                 IsNegative=(IsNonNegative, IsPositive, IsZero, IsImaginary,),
                 IsNonPositive=(IsPositive, IsImaginary, ),
                 IsNonNegative=(IsNegative, IsImaginary, ),
-                IsZero=(IsPositive, IsNegative, IsPrime, IsOdd)
+                IsZero=(IsNonZero, IsPositive, IsNegative, IsPrime, IsOdd),
+                IsNonZero=(IsZero,)
                 )
 
 class Inclusion(Condition):
@@ -614,7 +615,7 @@ class Inclusion(Condition):
                 if (self.__class__ is IsNonPositive and other.__class__ is IsNegative) \
                        or (self.__class__ is IsNonNegative and other.__class__ is IsPositive):
                     if negative:
-                        return Not(IsZero(self.expr))
+                        return IsNonZero(self.expr)
                     return IsZero(self.expr)
                 if self.__class__ is IsNonPositive and other.__class__ is IsZero:
                     if negative:
@@ -640,6 +641,10 @@ class IsComplex(Inclusion):
     def canonize(cls, (arg,)):
         if arg.is_Real: return True
         if arg.is_ImaginaryUnit: return True
+        if arg.is_Add and len(arg)==1:
+            # IsComplex(-2*x) -> IsComplex(x)
+            s,n = arg.items()[0]
+            return cls(s)
 
 class IsReal(IsComplex):
 
@@ -648,6 +653,10 @@ class IsReal(IsComplex):
         if arg.is_Real: return True
         if arg.is_Number: return False
         if arg.is_ImaginaryUnit: return False
+        if arg.is_Add and len(arg)==1:
+            # IsReal(-2*x) -> IsReal(x)
+            s,n = arg.items()[0]
+            return cls(s)
 
 class IsImaginary(IsComplex):
 
@@ -655,6 +664,10 @@ class IsImaginary(IsComplex):
     def canonize(cls, (arg,)):
         if arg.is_Number: return False
         if arg.is_ImaginaryUnit: return True
+        if arg.is_Add and len(arg)==1:
+            # IsImaginary(-2*x) -> IsImaginary(x)
+            s,n = arg.items()[0]
+            return cls(s)
 
 class IsRational(IsReal):
     
@@ -663,6 +676,14 @@ class IsRational(IsReal):
         if arg.is_Rational: return True
         if arg.is_Number: return False
         if arg.is_ImaginaryUnit: return False
+        if arg.is_Add and len(arg)==1:
+            # IsRational(-2*x) -> IsRational(x)
+            s,n = arg.items()[0]
+            if n.is_Rational:
+                return cls(s)
+            if n.is_negative:
+                return cls(-arg)
+
 
 class IsIrrational(IsReal):
 
@@ -670,6 +691,14 @@ class IsIrrational(IsReal):
     def canonize(cls, (arg,)):
         if arg.is_Rational: return False
         if arg.is_ImaginaryUnit: return False
+        if arg.is_Add and len(arg)==1:
+            # IsIrrational(-2*x) -> IsIrrational(x)
+            s,n = arg.items()[0]
+            if n.is_Rational:
+                return cls(s)
+            if n.is_negative:
+                return cls(-arg)
+
 
 class IsInteger(IsRational):
     
@@ -678,6 +707,15 @@ class IsInteger(IsRational):
         if arg.is_Integer: return True
         if arg.is_Number: return False
         if arg.is_ImaginaryUnit: return False
+        if arg.is_Add and len(arg)==1:
+            # IsInteger(-2*x) -> IsInteger(x)
+            s,n = arg.items()[0]
+            if n.is_Integer:
+                return cls(s)
+            if n.is_Fraction and n.p!=1:
+                return cls(s/n.q)
+            if n.is_negative:
+                return cls(-arg)
 
 class IsFraction(IsRational):
     
@@ -686,6 +724,12 @@ class IsFraction(IsRational):
         if arg.is_Fraction: return True
         if arg.is_Number: return False
         if arg.is_ImaginaryUnit: return False
+        if arg.is_Add and len(arg)==1:
+            # IsFraction(-2*x) -> IsFraction(2*x)
+            s,n = arg.items()[0]
+            if n.is_negative:
+                return cls(-arg)
+
 
 class IsPrime(IsInteger):
 
@@ -708,6 +752,11 @@ class IsComposite(IsInteger):
             return not isprime(arg)
         if arg.is_Number:
             return False
+        if arg.is_Add and len(arg)==1:
+            # IsComposite(-2*x) -> IsComposite(2*x)
+            s,n = arg.items()[0]
+            if n.is_negative and not (-n).is_one:
+                return cls(-arg)
 
 class IsEven(IsInteger):
 
@@ -717,7 +766,14 @@ class IsEven(IsInteger):
             return arg % 2==0
         if arg.is_Number:
             return False
-
+        if arg.is_Add and len(arg)==1:
+            # IsEven(-2*x) -> IsEven(2*x)
+            s,n = arg.items()[0]
+            if n.is_negative:
+                return IsEven(-arg)
+            if n.is_odd:
+                return IsEven(s)
+            
 class IsOdd(IsInteger):
 
     @classmethod
@@ -726,6 +782,13 @@ class IsOdd(IsInteger):
             return arg % 2==1
         if arg.is_Number:
             return False
+        if arg.is_Add and len(arg)==1:
+            # IsOdd(-2*x) -> IsOdd(2*x)
+            s,n = arg.items()[0]
+            if n.is_negative:
+                return IsOdd(-arg)
+            if n.is_even:
+                return IsOdd(s)
 
 class Signed(IsReal):
 
@@ -739,14 +802,27 @@ class IsNonPositive(Signed):
     def canonize(cls, (arg,)):
         if arg.is_Number:
             return arg <= 0
-
+        if arg.is_Add and len(arg)==1:
+            # IsNonPositive(-2*x) -> IsNonNegative(x)
+            s,n = arg.items()[0]
+            if n.is_positive:
+                return IsNonPositive(s)
+            if n.is_negative:
+                return IsNonNegative(s)
+            
 class IsNonNegative(Signed):
     
     @classmethod
     def canonize(cls, (arg,)):
         if arg.is_Number:
             return arg >= 0
-
+        if arg.is_Add and len(arg)==1:
+            # IsNonNegative(-2*x) -> IsNonPositive(x)
+            s,n = arg.items()[0]
+            if n.is_positive:
+                return IsNonNegative(s)
+            if n.is_negative:
+                return IsNonPositive(s)
 
 class IsPositive(IsNonNegative):
     """ Represents condition x > 0.
@@ -756,7 +832,13 @@ class IsPositive(IsNonNegative):
     def canonize(cls, (arg,)):
         if arg.is_Number:
             return arg > 0
-
+        if arg.is_Add and len(arg)==1:
+            # IsPositive(-2*x) -> IsNegative(x)
+            s,n = arg.items()[0]
+            if n.is_positive:
+                return IsPositive(s)
+            if n.is_negative:
+                return IsNegative(s)
 
 class IsNegative(IsNonPositive):
 
@@ -764,6 +846,14 @@ class IsNegative(IsNonPositive):
     def canonize(cls, (arg,)):
         if arg.is_Number:
             return arg < 0
+        if arg.is_Add and len(arg)==1:
+            # IsNegative(-2*x) -> IsPositive(x)
+            s,n = arg.items()[0]
+            if n.is_positive:
+                return IsNegative(s)
+            if n.is_negative:
+                return IsPositive(s)
+
 
 class IsZero(IsNonNegative, IsNonPositive, IsEven, IsComposite):
     @classmethod
@@ -772,5 +862,15 @@ class IsZero(IsNonNegative, IsNonPositive, IsEven, IsComposite):
             return arg==0
         if arg.is_Add and len(arg)==1:
             # IsZero(2*x) -> IsZero(x)
-            return IsZero(arg.items()[0][0])
+            s,n = arg.items()[0]
+            return IsZero(s)
 
+class IsNonZero(IsNegative, IsPositive, IsOdd, IsPrime):
+    @classmethod
+    def canonize(cls, (arg,)):
+        if arg.is_Number:
+            return arg!=0
+        if arg.is_Add and len(arg)==1:
+            # IsNonZero(2*x) -> IsNonZero(x)
+            s,n = arg.items()[0]
+            return IsNonZero(s)
