@@ -1,0 +1,7 @@
+SymPy is managed in a Mercurial repository. You can download it using:
+
+hg clone http://hg.sympy.org/sympy/
+
+We are sorry that you downloaded this svn repository. Unfortunately, the Google
+Code Hosting doesn't allow us to put a link to our hg repository on the web
+page (instead of this svn repository).
